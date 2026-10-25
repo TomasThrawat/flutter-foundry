@@ -3,24 +3,34 @@
 The existing Flutter Foundry MCP endpoint exposes a unified audit interface alongside Flutter engineering tools.
 
 ## MCP tools
-
-- flutter_audit_engine_catalog: list repositories, stated licenses, capabilities and integration limits.
+- flutter_audit_engine_catalog: list scanner catalog entries and integration limits.
 - flutter_audit_engine_status: probe installed local CLI tools without running a scan.
-- flutter_audit_scan_supplied_files: run heuristic checks against supplied source text without executing it.
-- flutter_audit_run_engine: run one allowlisted CLI against a local repository.
-- flutter_audit_scan_local_repository: run selected available scanners with a bounded runtime and sanitized output.
+- flutter_audit_scan_supplied_files: heuristic checks against supplied source text without executing it.
+- flutter_audit_run_engine: run one allowlisted local CLI.
+- flutter_audit_scan_local_repository: run selected locally available scanners.
+- flutter_audit_run_github_workflow: dispatch an audit workflow for a public repository, limited to 10 MCP-triggered runs per hour.
 
-Direct CLI adapters cover Trivy, Gitleaks, Semgrep, OSV-Scanner, zizmor, Ruff, ShellCheck, Biome, detekt, ktlint, golangci-lint, Supply Chain Guard and Prism Scanner. Install each upstream tool separately; this app does not download executables automatically.
+## Automatic and on-demand execution
+- The Audit Engine Scans workflow runs automatically for pull requests targeting main.
+- From MCP, call flutter_audit_run_github_workflow with targetRepository (owner/repository), targetRef (branch, tag, or commit), and engine (all, trivy, gitleaks, semgrep, osv-scanner, zizmor, ruff, shellcheck, or biome).
+- The workflow produces a summary and per-engine logs/reports as an artifact. Open the returned run URL to follow progress and download the reports.
+- Only public repositories are accepted. Target project build scripts and package install scripts are not run. A non-zero scanner exit may mean findings or a scanner/configuration issue; inspect the artifact.
+- Scans run on GitHub Actions, so Vercel does not need scanner binaries.
 
-The catalog also includes Super-Linter, MegaLinter, CodeQL, PR-Agent, Codegraph, Argus, Trivy MCP, the AWS sample MCP security scanner, Lintro, LeakFerret, Nox, AI PatchLab and Comply OSS. They are categorized as CI integrations, standalone MCP servers, model-backed workflows or tools needing additional compatibility checks. They are not all launched as child processes.
+## Required one-time configuration for MCP-triggered scans
+Add GITHUB_AUDIT_TOKEN to the Production and Preview environment variables of the Vercel project, then redeploy. Use a fine-grained token scoped only to TomasThrawat/flutter-foundry with:
+- Actions: Read and write
+- Contents: Read-only
 
-## Execution safety
+The token is used by MCP to dispatch the workflow and read run status. Never put it in source code, workflow inputs, or chat messages. Without it, MCP returns not_configured; pull-request scans still run automatically.
 
-- Child processes use a fixed executable/argument allowlist with shell disabled. Clients cannot send arbitrary commands.
-- The default scan root is the server current working directory. Set AUDIT_ALLOWED_ROOTS to comma-separated trusted absolute paths to allow other repositories.
-- AUDIT_ENGINE_TIMEOUT_MS configures a single-engine timeout, capped at 20 seconds. Multi-engine calls have a 43-second total budget.
-- Output is bounded and credential-like fields are redacted. This is defense-in-depth, not a guarantee that every secret format is detected.
-- Vercel does not bundle native scanner binaries. Engine status reports missing binaries until a supported runtime provides them. Source-text heuristics work without scanners but do not replace them.
-- Semgrep rule retrieval and Trivy/OSV/Supply Chain Guard data updates may need network access.
-- PR-Agent and AI-based license analysis are not called automatically. Model providers may charge fees.
-- Check transitive dependencies, rule packs, containers and model-provider terms before redistribution.
+The trigger checks repository visibility, rejects archived/private repositories and malformed refs, and limits MCP-triggered runs to 10 per hour. The workflow independently validates inputs and checks out target source with persisted credentials disabled.
+
+## Direct CLI adapters
+Direct local CLI adapters cover Trivy, Gitleaks, Semgrep, OSV-Scanner, zizmor, Ruff, ShellCheck, Biome, detekt, ktlint, golangci-lint, Supply Chain Guard and Prism Scanner. These local CLI engines still require binaries installed in their runtime. The catalog also contains CI/MCP/LLM integrations that are not all invoked as child processes.
+
+## Local CLI execution safety
+- Child processes use fixed executable/argument allowlists with shell disabled.
+- AUDIT_ALLOWED_ROOTS controls trusted local repository paths.
+- AUDIT_ENGINE_TIMEOUT_MS configures single-engine timeout (capped at 20 seconds); multi-engine calls have a 43-second budget.
+- Output is bounded and credential-like fields are redacted, but redaction is not guaranteed to catch every secret.
