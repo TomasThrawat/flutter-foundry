@@ -109,7 +109,7 @@ export function generateIconFromPrompt(input:IconGenerationInput):IconGeneration
 
   if(concept==="qr-code"){
     const cell=16,start=88, reserved=(r:number,c:number)=>(r<7&&c<7)||(r<7&&c>=14)||(r>=14&&c<7)||(r>=14&&r<=18&&c>=14&&c<=18)||r===6||c===6;
-    for(let r=0;r<21;r++)for(let c=0;c<21;c++){if(reserved(r,c)||random()<(style==="minimal"?.62:.51))continue;const d=style==="pixel"?14:style==="rounded"?12:11;if(style==="abstract")circle(start+c*cell+8,start+r*cell+8,5.8,fg);else rect(start+c*cell+(16-d)/2,start+r*cell+(16-d)/2,d,d,fg,style==="rounded"?4:0);}
+    for(let r=0;r<21;r++)for(let c=0;c<21;c++){if(reserved(r,c)||random()<(style==="minimal" ? .62 : .51))continue;const d=style==="pixel"?14:style==="rounded"?12:11;if(style==="abstract")circle(start+c*cell+8,start+r*cell+8,5.8,fg);else rect(start+c*cell+(16-d)/2,start+r*cell+(16-d)/2,d,d,fg,style==="rounded"?4:0);}
     for(const [r,c] of [[0,0],[0,14],[14,0]]){const x=start+c*cell,y=start+r*cell;rect(x,y,112,112,fg);rect(x+16,y+16,80,80,negative);rect(x+32,y+32,48,48,fg);}
     const ax=start+14*cell,ay=start+14*cell;rect(ax,ay,80,80,fg,radius);rect(ax+16,ay+16,48,48,negative,radius/2);rect(ax+32,ay+32,16,16,accent);
     for(let i=8;i<13;i+=2){rect(start+i*cell,start+6*cell,cell,cell,fg);rect(start+6*cell,start+i*cell,cell,cell,fg);}
