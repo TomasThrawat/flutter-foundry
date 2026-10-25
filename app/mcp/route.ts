@@ -3,7 +3,8 @@ import { z } from "zod";
 import { analyzeBuildLog, auditAccessibility, auditAndroidFiles, checkLocalizations, summarizeLcov } from "@/lib/analysis";
 import { getPubPackage, queryOsvPackages, searchPubPackages } from "@/lib/resources";
 import { runSvgEdit } from "@/lib/svg-edit";
-import { registerAuditTools } from "@/lib/audit-engines";\nimport { registerGithubAuditTools } from "@/lib/github-audit-runner";
+import { registerAuditTools } from "@/lib/audit-engines";
+import { registerGithubAuditTools } from "@/lib/github-audit-runner";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -181,7 +182,8 @@ const handler = createMcpHandler((server) => {
     integration: "Playwright + Chromium; open editor, call loadSvgString, serialize canvas, capture screenshot.",
     license: "Verify upstream and dependency licenses before redistribution."
   }));
-  registerAuditTools(register);\n  registerGithubAuditTools(register);
+  registerAuditTools(register);
+  registerGithubAuditTools(register);
 });
 
 function authorize(request: Request): Response | null {
