@@ -137,8 +137,14 @@ export async function runSvgEdit(svgInput: string): Promise<SvgEditResult> {
       throw new Error("SVG-Edit did not expose an SVG serialization method.");
     }, svg);
     const cleanOutput = sanitizeSvgInput(outputSvg);
-    await page.waitForTimeout(250);
-    const screenshot = await page.screenshot({ type: "png", fullPage: false });
+    // Capture the sanitized icon SVG itself, not the surrounding editor interface.
+    await page.setContent(
+      "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /></head><body style=\"margin:0;padding:0\">" + cleanOutput + "</body></html>",
+      { waitUntil: "domcontentloaded" }
+    );
+    const icon = page.locator("svg").first();
+    await icon.waitFor({ state: "visible", timeout: 5000 });
+    const screenshot = await icon.screenshot({ type: "png", animations: "disabled" });
     return { svg: cleanOutput, previewPngBase64: screenshot.toString("base64"), editorUrl, elapsedMs: Date.now() - started };
   } finally {
     await browser.close();

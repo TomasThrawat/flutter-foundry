@@ -3,6 +3,7 @@ import { z } from "zod";
 import { analyzeBuildLog, auditAccessibility, auditAndroidFiles, checkLocalizations, summarizeLcov } from "@/lib/analysis";
 import { getPubPackage, queryOsvPackages, searchPubPackages } from "@/lib/resources";
 import { runSvgEdit } from "@/lib/svg-edit";
+import { generateIconFromPrompt } from "@/lib/icon-generator";
 import { registerAuditTools } from "@/lib/audit-engines";
 
 export const runtime = "nodejs";
@@ -165,6 +166,38 @@ const handler = createMcpHandler((server) => {
       ];
       return { findings: patterns.filter(item => item.regex.test(report)).map(item => ({ evidenceType: item.label, recommendation: item.recommendation })),
         reportLength: report.length, note: "Text-based triage. Use Android SDK tools on the actual artifact to verify signatures, SDK metadata, native libraries and permissions." };
+    });
+
+  register("icon_generate_from_prompt", "Generate an original icon from a text prompt",
+    "Create a fresh SVG icon from a natural-language description using procedural vector geometry; no preset SVG files or image API are used. Returns SVG source and by default attempts to export a square PNG via SVG-Edit. Set renderPng=false to request SVG only.",
+    z.object({
+      prompt: z.string().min(3).max(500),
+      style: z.enum(["auto", "minimal", "geometric", "rounded", "outline", "pixel", "abstract"]).optional(),
+      size: z.number().int().min(128).max(1024).optional(),
+      backgroundColor: z.string().max(32).optional(),
+      foregroundColor: z.string().max(32).optional(),
+      accentColor: z.string().max(32).optional(),
+      renderPng: z.boolean().optional()
+    }).strict(),
+    async ({ prompt, style, size, backgroundColor, foregroundColor, accentColor, renderPng }: {
+      prompt: string;
+      style?: "auto" | "minimal" | "geometric" | "rounded" | "outline" | "pixel" | "abstract";
+      size?: number;
+      backgroundColor?: string;
+      foregroundColor?: string;
+      accentColor?: string;
+      renderPng?: boolean;
+    }) => {
+      const generated = generateIconFromPrompt({ prompt, style, size, backgroundColor, foregroundColor, accentColor });
+      if (renderPng === false) return { ...generated, pngExport: { status: "not_requested", nextTool: "svgedit_process_svg" } };
+      try {
+        const rendered = await runSvgEdit(generated.svgMarkup);
+        return { ...generated, pngBase64: rendered.previewPngBase64, pngMimeType: "image/png",
+          pngExport: { status: "success", width: generated.size, height: generated.size, elapsedMs: rendered.elapsedMs } };
+      } catch (error) {
+        return { ...generated, pngExport: { status: "failed", error: error instanceof Error ? error.message : "PNG export failed.",
+          nextTool: "svgedit_process_svg" }, note: "SVG generation succeeded; PNG export failed separately. SVG source remains in svgMarkup." };
+      }
     });
 
   register("svgedit_process_svg", "Edit and export SVG through SVG-Edit", "Playwright Chromium opens upstream SVG-Edit, imports SVG into its editor canvas, serializes the result and captures a PNG screenshot. No template icon generator or image API is used.",
