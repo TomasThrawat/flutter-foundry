@@ -17,15 +17,16 @@
     "test:svg-edit": "playwright test tests/svg-edit.integration.spec.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "^2.4.0",
     "@sparticuz/chromium": "^138.0.2",
     "@xmldom/xmldom": "^0.9.12",
-    "mcp-handler": "^1.1.0",
+    "mcp-handler": "^2.3.0",
     "next": "^16.4.3",
     "playwright-core": "^1.54.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "sharp": "^0.35.5",
-    "zod": "^3.25.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",
