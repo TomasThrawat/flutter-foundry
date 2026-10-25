@@ -79,7 +79,7 @@ export function scanSuppliedFiles(files:Array<{path:string;content:string}>){
  {id:"python.shell-true",regex:/\bshell\s*=\s*True\b/,severity:"high",recommendation:"Prefer argument arrays with shell disabled."},
  {id:"web.dangerously-set-html",regex:/\bdangerouslySetInnerHTML\b/,severity:"high",recommendation:"Sanitize untrusted HTML before rendering."},
  {id:"workflow.write-all",regex:/^\s*permissions:\s*write-all\s*$/i,severity:"high",recommendation:"Use least-privilege workflow permissions."},
- {id:"workflow.unpinned-action",regex:/^\s*uses:\s*[^#\s]+@(?:v\d+|main|master|latest)\s*$/i,severity:"medium",recommendation:"Pin third-party Actions to a reviewed full commit SHA."},
+ {id:"workflow.unpinned-action",regex:/^\s*(?:-\s*)?uses:\s*[^#\s]+@(?:v\d+|main|master|latest)\s*$/i,severity:"medium",recommendation:"Pin third-party Actions to a reviewed full commit SHA."},
  {id:"network.cleartext-http",regex:/https?:\/\/(?!localhost\b|127\.0\.0\.1\b)[^\s"'<>]+/i,severity:"low",recommendation:"Review cleartext HTTP; use HTTPS for sensitive traffic."}
  ];
  for(const file of files){const p=file.path.replace(/\\/g,"/").slice(0,300);const lines=file.content.split(/\r?\n/);
