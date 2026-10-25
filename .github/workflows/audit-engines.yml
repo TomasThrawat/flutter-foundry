@@ -39,7 +39,7 @@ jobs:
       AUDIT_ENGINE: ${{ github.event_name == 'workflow_dispatch' && inputs.engine || 'all' }}
     steps:
       - name: Check out trusted scanner code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.event.pull_request.base.sha || github.sha }}
@@ -76,7 +76,7 @@ jobs:
           echo "Requested engine: $AUDIT_ENGINE"
       - name: Check out target source without credentials
         if: ${{ steps.scanner.outputs.available == 'true' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: ${{ env.TARGET_REPOSITORY }}
           ref: ${{ env.TARGET_REF }}
@@ -90,7 +90,7 @@ jobs:
           AUDIT_ENGINE: ${{ env.AUDIT_ENGINE }}
       - name: Upload audit reports
         if: always() && steps.scanner.outputs.available == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: audit-report-${{ github.run_id }}
           path: ${{ runner.temp }}/flutter-foundry-audit-reports/
