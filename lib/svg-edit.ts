@@ -47,7 +47,8 @@ export function sanitizeSvgInput(svg: string): string {
     throw new Error("The root element must be <svg>.");
   }
 
-  const visit = (element: Element) => {
+  type SvgElement = NonNullable<typeof root>;
+  const visit = (element: SvgElement) => {
     const tag = element.localName || element.nodeName;
     if (!ALLOWED_ELEMENTS.has(tag)) throw new Error("Unsupported SVG element: <" + tag + ">.");
     const remove: string[] = [];
@@ -129,7 +130,7 @@ export async function runSvgEdit(svgInput: string): Promise<SvgEditResult> {
       editor.loadSvgString(source, { noAlert: true });
       const canvas = editor.svgCanvas;
       if (typeof canvas.getSvgString === "function") return canvas.getSvgString();
-      if (canvas.svgroot) return new XMLSerializer().serializeToString(canvas.svgroot);
+      if (canvas.svgroot) return canvas.svgroot.outerHTML;
       throw new Error("SVG-Edit did not expose an SVG serialization method.");
     }, svg);
     const cleanOutput = sanitizeSvgInput(outputSvg);
