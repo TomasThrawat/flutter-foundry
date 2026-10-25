@@ -38,4 +38,4 @@ Direct local CLI adapters cover Trivy, Gitleaks, Semgrep, OSV-Scanner, zizmor, R
 
 ## Reading scanner exit codes
 
-The audit artifact includes individual scanner logs and JSON reports where supported. A zero code means the command completed; nonzero codes can mean findings or a scanner/configuration failure. Review the relevant JSON report and diagnostic log before concluding that a scan is clean. Engines are recorded as skipped if the project does not contain files in their supported language/type.
+The audit artifact includes per-engine logs and machine-readable JSON reports where supported. A zero code means the command completed; nonzero codes can indicate findings or scanner/configuration failure. Review the report and diagnostic log before concluding that a scan is clean. Engines are recorded as skipped when the repository has no files of the supported type.
