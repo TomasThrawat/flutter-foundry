@@ -6,6 +6,7 @@ import { runSvgEdit } from "@/lib/svg-edit";
 import { generateIconFromPrompt } from "@/lib/icon-generator";
 import { renderIconPng, validateCustomIconSvg } from "@/lib/icon-png";
 import { registerAuditTools } from "@/lib/audit-engines";
+import { registerGithubAuditTools } from "@/lib/github-audit-runner";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -243,6 +244,7 @@ const handler = createMcpHandler((server) => {
     license: "Verify upstream and dependency licenses before redistribution."
   }));
   registerAuditTools(register);
+  registerGithubAuditTools(register);
 });
 
 function authorize(request: Request): Response | null {
