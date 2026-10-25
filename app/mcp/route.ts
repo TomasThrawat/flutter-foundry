@@ -4,6 +4,7 @@ import { analyzeBuildLog, auditAccessibility, auditAndroidFiles, checkLocalizati
 import { getPubPackage, queryOsvPackages, searchPubPackages } from "@/lib/resources";
 import { runSvgEdit } from "@/lib/svg-edit";
 import { generateIconFromPrompt } from "@/lib/icon-generator";
+import { renderIconPng } from "@/lib/icon-png";
 import { registerAuditTools } from "@/lib/audit-engines";
 
 export const runtime = "nodejs";
@@ -169,7 +170,7 @@ const handler = createMcpHandler((server) => {
     });
 
   register("icon_generate_from_prompt", "Generate an original icon from a text prompt",
-    "Create a fresh SVG icon from a natural-language description using procedural vector geometry; no preset SVG files or image API are used. Returns SVG source and by default attempts to export a square PNG via SVG-Edit. Set renderPng=false to request SVG only.",
+    "Create a fresh SVG icon from a natural-language description using procedural vector geometry; no preset SVG files or image API are used. Returns SVG source and by default rasterizes a square PNG directly with Sharp, without launching Chromium. Set renderPng=false to request SVG only.",
     z.object({
       prompt: z.string().min(3).max(500),
       style: z.enum(["auto", "minimal", "geometric", "rounded", "outline", "pixel", "abstract"]).optional(),
@@ -191,12 +192,15 @@ const handler = createMcpHandler((server) => {
       const generated = generateIconFromPrompt({ prompt, style, size, backgroundColor, foregroundColor, accentColor });
       if (renderPng === false) return { ...generated, pngExport: { status: "not_requested", nextTool: "svgedit_process_svg" } };
       try {
-        const rendered = await runSvgEdit(generated.svgMarkup);
-        return { ...generated, pngBase64: rendered.previewPngBase64, pngMimeType: "image/png",
-          pngExport: { status: "success", width: generated.size, height: generated.size, elapsedMs: rendered.elapsedMs } };
+        // Rasterize the generated SVG directly with Sharp instead of launching a
+        // second Chromium process. This keeps the default icon PNG path reliable
+        // on memory- and /tmp-constrained serverless instances.
+        const rendered = await renderIconPng(generated.svgMarkup, generated.size);
+        return { ...generated, pngBase64: rendered.pngBase64, pngMimeType: "image/png",
+          pngExport: { status: "success", width: rendered.width, height: rendered.height, elapsedMs: rendered.elapsedMs } };
       } catch (error) {
-        return { ...generated, pngExport: { status: "failed", error: error instanceof Error ? error.message : "PNG export failed.",
-          nextTool: "svgedit_process_svg" }, note: "SVG generation succeeded; PNG export failed separately. SVG source remains in svgMarkup." };
+        return { ...generated, pngExport: { status: "failed", error: error instanceof Error ? error.message : "PNG rasterization failed.",
+          nextTool: "svgedit_process_svg" }, note: "SVG generation succeeded; PNG rasterization failed separately. SVG source remains in svgMarkup." };
       }
     });
 
