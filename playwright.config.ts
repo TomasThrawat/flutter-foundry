@@ -1,0 +1,2 @@
+import { defineConfig, devices } from "@playwright/test";
+export default defineConfig({testDir:"./tests",testMatch:"svg-edit.integration.spec.ts",timeout:60000,retries:process.env.CI?1:0,reporter:"list",use:{baseURL:process.env.SVG_EDIT_URL||"https://svgedit.netlify.app/index.html",trace:"retain-on-failure",...devices["Desktop Chrome"]}});

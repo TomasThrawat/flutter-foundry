@@ -1,0 +1,6 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { sanitizeSvgInput } from "../lib/svg-edit";
+test("sanitizer retains vector geometry and adds defaults",()=>{const svg=sanitizeSvgInput('<svg xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="20" r="10" fill="#fff"/></svg>');assert.match(svg,/<circle/);assert.match(svg,/viewBox="0 0 512 512"/);assert.match(svg,/width="512"/);});
+test("sanitizer rejects script/external content and entity declarations",()=>{assert.throws(()=>sanitizeSvgInput('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),/Unsupported SVG element/);assert.throws(()=>sanitizeSvgInput('<svg xmlns="http://www.w3.org/2000/svg"><image href="https://example.com/a.png"/></svg>'),/Unsupported SVG element/);assert.throws(()=>sanitizeSvgInput('<!DOCTYPE svg [<!ENTITY x "hi">]><svg/>'),/DOCTYPE/);});
+test("sanitizer removes event handler attributes",()=>{const svg=sanitizeSvgInput('<svg xmlns="http://www.w3.org/2000/svg" onload="x()"><circle onclick="x()" r="10"/></svg>');assert.doesNotMatch(svg,/onload|onclick/);});
