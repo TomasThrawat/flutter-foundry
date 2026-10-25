@@ -10,7 +10,8 @@ test("generates a safe SVG from a prompt",()=>{
   assert.equal(icon.colors.foreground,"#ffffff");
   assert.equal(icon.colors.accent,"#7c3aed");
   assert.match(sanitizeSvgInput(icon.svgMarkup),/^<svg/);
-  assert.doesNotMatch(icon.svgMarkup,/<script|javascript:|https?:\/\//i);
+  // The SVG xmlns namespace is an HTTP URL by specification; only executable or external references are forbidden.
+  assert.doesNotMatch(icon.svgMarkup,/<script|javascript:|(?:href|xlink:href)=["']https?:/i);
 });
 test("is deterministic for the same prompt and changes for another prompt",()=>{
   const a=generateIconFromPrompt({prompt:"abstract star logo"});
