@@ -38,10 +38,10 @@ export function sanitizeSvgInput(svg: string): string {
   const parser = new DOMParser({
     onError: (level, message) => {
       if (level === "error" || level === "fatalError") errors.push(message);
-    },
+    }
   });
   const doc = parser.parseFromString(svg, "image/svg+xml");
-  if (errors.length) throw new Error(\`Invalid SVG XML: ${errors[0]}\`);
+  if (errors.length) throw new Error("Invalid SVG XML: " + errors[0]);
   const root = doc.documentElement;
   if (!root || (root.localName || root.nodeName).toLowerCase() !== "svg") {
     throw new Error("The root element must be <svg>.");
@@ -49,7 +49,7 @@ export function sanitizeSvgInput(svg: string): string {
 
   const visit = (element: Element) => {
     const tag = element.localName || element.nodeName;
-    if (!ALLOWED_ELEMENTS.has(tag)) throw new Error(\`Unsupported SVG element: <${tag}>.\`);
+    if (!ALLOWED_ELEMENTS.has(tag)) throw new Error("Unsupported SVG element: <" + tag + ">.");
     const remove: string[] = [];
     for (let i = 0; i < element.attributes.length; i++) {
       const attr = element.attributes.item(i);
@@ -64,10 +64,10 @@ export function sanitizeSvgInput(svg: string): string {
       const lowerValue = value.toLowerCase();
       if (lowerValue.includes("javascript:") || lowerValue.includes("vbscript:") ||
           lowerValue.includes("data:text/html") || lowerValue.includes("@import")) {
-        throw new Error(\`Unsafe value in SVG attribute "${name}".\`);
+        throw new Error('Unsafe value in SVG attribute "' + name + '".');
       }
-      if (/url\\s*\\(/i.test(value) && !/url\\(\\s*["']?#[-\\w:.]+["']?\\s*\\)/i.test(value)) {
-        throw new Error(\`External or unsupported URL reference in SVG attribute "${name}".\`);
+      if (/url\s*\(/i.test(value) && !/url\(\s*["']?#[-\w:.]+["']?\s*\)/i.test(value)) {
+        throw new Error('External or unsupported URL reference in SVG attribute "' + name + '".');
       }
     }
     for (const name of remove) element.removeAttribute(name);
@@ -99,7 +99,7 @@ async function launchBrowser(): Promise<Browser> {
     return playwrightChromium.launch({
       args: chromiumBinary.args,
       executablePath: await chromiumBinary.executablePath(),
-      headless: true,
+      headless: true
     });
   }
   return playwrightChromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
@@ -123,7 +123,7 @@ export async function runSvgEdit(svgInput: string): Promise<SvgEditResult> {
         svgEditor?: {
           loadSvgString?: (input: string, options?: { noAlert?: boolean }) => void;
           svgCanvas?: { getSvgString?: () => string; svgroot?: SVGSVGElement };
-        };
+        }
       }).svgEditor;
       if (!editor?.loadSvgString || !editor.svgCanvas) throw new Error("SVG-Edit loaded but its canvas API was unavailable.");
       editor.loadSvgString(source, { noAlert: true });
