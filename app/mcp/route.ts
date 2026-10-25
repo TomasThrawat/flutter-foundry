@@ -4,7 +4,7 @@ import { analyzeBuildLog, auditAccessibility, auditAndroidFiles, checkLocalizati
 import { getPubPackage, queryOsvPackages, searchPubPackages } from "@/lib/resources";
 import { runSvgEdit } from "@/lib/svg-edit";
 import { generateIconFromPrompt } from "@/lib/icon-generator";
-import { renderIconPng } from "@/lib/icon-png";
+import { renderIconPng, validateCustomIconSvg } from "@/lib/icon-png";
 import { registerAuditTools } from "@/lib/audit-engines";
 
 export const runtime = "nodejs";
@@ -170,7 +170,7 @@ const handler = createMcpHandler((server) => {
     });
 
   register("icon_generate_from_prompt", "Generate an original icon from a text prompt",
-    "Create a fresh SVG icon from a natural-language description using procedural vector geometry; no preset SVG files or image API are used. Returns SVG source and by default rasterizes a square PNG directly with Sharp, without launching Chromium. Set renderPng=false to request SVG only.",
+    "Procedural vector fallback only; this does not run AI inference. For genuinely bespoke designs, have the calling AI author the SVG and pass it to icon_render_custom_svg. Returns SVG and can export PNG with Sharp without Chromium. Set renderPng=false for SVG only.",
     z.object({
       prompt: z.string().min(3).max(500),
       style: z.enum(["auto", "minimal", "geometric", "rounded", "outline", "pixel", "abstract"]).optional(),
@@ -202,6 +202,30 @@ const handler = createMcpHandler((server) => {
         return { ...generated, pngExport: { status: "failed", error: error instanceof Error ? error.message : "PNG rasterization failed.",
           nextTool: "svgedit_process_svg" }, note: "SVG generation succeeded; PNG rasterization failed separately. SVG source remains in svgMarkup." };
       }
+    });
+
+
+  register("icon_render_custom_svg", "Render an AI-authored custom icon",
+    "Render an original, model-authored SVG design (for example, SVG written by ChatGPT) into a square PNG. Use when the user wants a genuinely custom design rather than the keyword-based procedural fallback. The calling assistant must compose the complete SVG and supply it. No external image API, AI provider, API key, or paid service is called; this tool validates and rasterizes the supplied design only.",
+    z.object({
+      svgMarkup: z.string().min(20).max(250000),
+      size: z.number().int().min(128).max(1024).optional()
+    }).strict(),
+    async ({ svgMarkup, size }: { svgMarkup: string; size?: number }) => {
+      const safeSvg = validateCustomIconSvg(svgMarkup);
+      const rendered = await renderIconPng(safeSvg, size ?? 512);
+      return {
+        svgMarkup: safeSvg,
+        pngBase64: rendered.pngBase64,
+        pngMimeType: "image/png",
+        width: rendered.width,
+        height: rendered.height,
+        elapsedMs: rendered.elapsedMs,
+        generationMode: "assistant-authored-svg",
+        aiProvider: null,
+        paidApiRequired: false,
+        note: "The connected assistant authored the SVG. Flutter Foundry only validates and renders it; no separate AI service was called."
+      };
     });
 
   register("svgedit_process_svg", "Edit and export SVG through SVG-Edit", "Playwright Chromium opens upstream SVG-Edit, imports SVG into its editor canvas, serializes the result and captures a PNG screenshot. No template icon generator or image API is used.",
