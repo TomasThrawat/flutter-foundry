@@ -34,3 +34,8 @@ Direct local CLI adapters cover Trivy, Gitleaks, Semgrep, OSV-Scanner, zizmor, R
 - AUDIT_ALLOWED_ROOTS controls trusted local repository paths.
 - AUDIT_ENGINE_TIMEOUT_MS configures single-engine timeout (capped at 20 seconds); multi-engine calls have a 43-second budget.
 - Output is bounded and credential-like fields are redacted, but redaction is not guaranteed to catch every secret.
+
+
+## Reading scanner exit codes
+
+The audit artifact includes individual scanner logs and JSON reports where supported. A zero code means the command completed; nonzero codes can mean findings or a scanner/configuration failure. Review the relevant JSON report and diagnostic log before concluding that a scan is clean. Engines are recorded as skipped if the project does not contain files in their supported language/type.
