@@ -72,10 +72,23 @@ if should_run semgrep; then
 fi
 
 if should_run osv-scanner; then
-  run_scan_json osv-scanner "$REPORT_DIR/osv-scanner.json" docker run --rm \
-    -v "$PWD/$TARGET_DIR:/src:ro" \
-    -v "$REPORT_DIR:/out" \
-    ghcr.io/google/osv-scanner:v2.3.3 scan source -r /src --format json
+  if find "$TARGET_DIR" -type f \( \
+    -name 'package-lock.json' -o -name 'pnpm-lock.yaml' -o -name 'yarn.lock' -o \
+    -name 'Cargo.lock' -o -name 'go.sum' -o -name 'go.mod' -o \
+    -name 'poetry.lock' -o -name 'Pipfile.lock' -o -name 'requirements*.txt' -o \
+    -name 'Gemfile.lock' -o -name 'composer.lock' -o -name 'pubspec.lock' -o \
+    -name 'mix.lock' -o -name 'pom.xml' -o -name 'gradle.lockfile' -o \
+    -name '*.spdx' -o -name '*.spdx.json' -o -name '*.cdx.json' -o \
+    -name 'bom.json' -o -name 'bom.xml' \) -print -quit | grep -q .; then
+    run_scan_json osv-scanner "$REPORT_DIR/osv-scanner.json" docker run --rm \
+      -v "$PWD/$TARGET_DIR:/src:ro" \
+      -v "$REPORT_DIR:/out" \
+      ghcr.io/google/osv-scanner:v2.3.3 scan source -r /src --format json
+  else
+    printf 'osv-scanner\\tSKIPPED\\n' >> "$SUMMARY_FILE"
+    printf '{"status":"skipped","reason":"No supported lockfile or SBOM was found."}\\n' > "$REPORT_DIR/osv-scanner.json"
+    echo "Skipped: no supported lockfile or SBOM was found; package.json alone does not pin resolved dependency versions." > "$REPORT_DIR/osv-scanner.log"
+  fi
 fi
 
 if should_run zizmor; then
@@ -133,24 +146,80 @@ if should_run biome; then
   fi
 fi
 
-{
-  echo "# Audit report"
-  echo
-  echo "- Target: $TARGET_REPOSITORY@$TARGET_REF"
-  echo "- Engine selection: $ENGINE"
-  echo "- Exit code 0 means the command completed; non-zero can mean findings or scanner/configuration problems."
-  echo "- The workflow scans files and does not run target build scripts or package install scripts."
-  echo
-  echo "| Scanner | Exit code |"
-  echo "|---|---:|"
-  while IFS=$'\t' read -r name code; do
-    [[ -n "${name:-}" ]] || continue
-    echo "| $name | $code |"
-  done < "$SUMMARY_FILE"
-  echo
-  echo "Download the artifact for individual scanner logs and machine-readable reports."
-} > "$REPORT_DIR/summary.md"
+python3 - "$SUMMARY_FILE" "$REPORT_DIR" "$TARGET_REPOSITORY" "$TARGET_REF" "$ENGINE" > "$REPORT_DIR/summary.md" <<'PY'
+import json, os, sys
+summary_file, report_dir, repository, ref, engine = sys.argv[1:]
+def read_json(name):
+    try:
+        with open(os.path.join(report_dir, name), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+rows = []
+with open(summary_file, encoding="utf-8") as f:
+    for line in f:
+        fields = line.rstrip("\n").split("\t", 1)
+        if len(fields) == 2:
+            rows.append(fields)
+details = {}
+trivy = read_json("trivy.json")
+if isinstance(trivy, dict):
+    results = trivy.get("Results") or []
+    vulns = sum(len(r.get("Vulnerabilities") or []) for r in results if isinstance(r, dict))
+    misconfigs = sum(len(r.get("Misconfigurations") or []) for r in results if isinstance(r, dict))
+    details["trivy"] = f"{vulns} vulnerabilities; {misconfigs} misconfigurations"
+gitleaks = read_json("gitleaks.json")
+if isinstance(gitleaks, list):
+    details["gitleaks"] = f"{len(gitleaks)} secret findings"
+semgrep = read_json("semgrep.json")
+semgrep_parser_errors = 0
+if isinstance(semgrep, dict):
+    findings = len(semgrep.get("results") or [])
+    errors = semgrep.get("errors") or []
+    semgrep_parser_errors = len(errors)
+    details["semgrep"] = f"{findings} findings; {len(errors)} scan/parser diagnostics"
+osv = read_json("osv-scanner.json")
+if isinstance(osv, dict) and osv.get("status") == "skipped":
+    details["osv-scanner"] = "skipped: no supported lockfile/SBOM"
+elif isinstance(osv, dict):
+    details["osv-scanner"] = "report generated; inspect JSON for package vulnerability details"
+biome = read_json("biome.json")
+biome_errors = 0
+if isinstance(biome, dict):
+    stat = biome.get("summary") or {}
+    biome_errors = int(stat.get("errors") or 0)
+    warnings = int(stat.get("warnings") or 0)
+    details["biome"] = f"{biome_errors} errors; {warnings} warnings"
+for name in ("ruff", "shellcheck"):
+    data = read_json(name + ".json")
+    if isinstance(data, list):
+        details[name] = f"{len(data)} diagnostics"
+    elif data is not None:
+        details[name] = "machine-readable report generated"
+with open(os.path.join(report_dir, "summary.md"), "a", encoding="utf-8") as f:
+    f.write("# Audit report\n\n")
+    f.write(f"- Target: {repository}@{ref}\n")
+    f.write(f"- Engine selection: {engine}\n")
+    f.write("- The workflow scans files without running target build scripts or dependency-install scripts.\n")
+    f.write("- Exit codes are not vulnerability verdicts; review scanner reports and diagnostic logs.\n\n")
+    f.write("| Scanner | Exit code/status | Summary |\n|---|---:|---|\n")
+    for name, code in rows:
+        if code == "SKIPPED":
+            status = "SKIPPED"
+        elif code != "0":
+            status = "non-zero (inspect report)"
+        elif name == "semgrep" and semgrep_parser_errors:
+            status = "partial scan (parser diagnostics)"
+        elif name == "biome" and biome_errors:
+            status = "lint diagnostics"
+        else:
+            status = "command completed"
+        detail = details.get(name, "see log/artifact")
+        f.write(f"| {name} | {status} | {detail} |\n")
+    f.write("\nInspect the individual JSON and log files for full details.\n")
+PY
 
 cat "$REPORT_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
 echo "Audit complete. Detailed logs and reports are in $REPORT_DIR."
 exit 0
