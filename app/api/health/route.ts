@@ -1,0 +1,2 @@
+export const runtime="nodejs";
+export async function GET(){return Response.json({status:"ok",service:"flutter-foundry",mcpEndpoint:"/mcp",iconEditor:"SVG-Edit via Playwright",timestamp:new Date().toISOString()});}

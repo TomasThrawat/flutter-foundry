@@ -1,0 +1,8 @@
+{
+  "name":"flutter-foundry","version":"1.0.0","private":false,
+  "description":"Open-source Flutter engineering MCP with SVG-Edit + Playwright icon workflow.","license":"MIT",
+  "engines":{"node":">=20"},
+  "scripts":{"dev":"next dev","build":"next build","start":"next start","lint":"eslint .","typecheck":"tsc --noEmit","test":"tsx --test tests/*.test.ts","test:svg-edit":"playwright test tests/svg-edit.integration.spec.ts"},
+  "dependencies":{"@sparticuz/chromium":"^138.0.2","@xmldom/xmldom":"^0.9.8","mcp-handler":"^1.0.5","next":"^15.2.6","playwright-core":"^1.54.2","react":"^19.1.0","react-dom":"^19.1.0","zod":"^3.25.0"},
+  "devDependencies":{"@playwright/test":"^1.54.2","@types/node":"^22.0.0","@types/react":"^19.0.0","@types/react-dom":"^19.0.0","eslint":"^9.0.0","eslint-config-next":"^15.2.6","tsx":"^4.19.0","typescript":"^5.8.0"}
+}
