@@ -1,10 +1,14 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals.js";
-import nextTs from "eslint-config-next/typescript.js";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { FlatCompat } from "@eslint/eslintrc";
+import { globalIgnores } from "eslint/config";
 
-export default defineConfig([
-  nextVitals,
-  nextTs,
+const compat = new FlatCompat({
+  baseDirectory: dirname(fileURLToPath(import.meta.url))
+});
+
+export default [
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
@@ -12,4 +16,4 @@ export default defineConfig([
     }
   },
   globalIgnores([".next/**", "node_modules/**", "playwright-report/**", "test-results/**"])
-]);
+];
