@@ -18,6 +18,9 @@ A fresh open-source Flutter engineering MCP server built around live official da
 - Heuristic Android manifest/Gradle and Flutter accessibility checks.
 - OSV scans for exact dependency versions.
 - SDK/dependency-context review and release-report triage.
+
+- Unified code-security audit MCP: engine catalog/status, heuristic checks for supplied files, and optional allowlisted local CLI scans with sanitized output. See docs/audit-mcp.md for limitations.
+
 - SVG-Edit + Playwright: browser opens upstream SVG-Edit, imports provided SVG into the editor canvas, serializes the result, and captures a PNG screenshot.
 
 ## Run locally
