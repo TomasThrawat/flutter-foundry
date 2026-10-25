@@ -72,7 +72,10 @@ export function sanitizeSvgInput(svg: string): string {
       }
     }
     for (const name of remove) element.removeAttribute(name);
-    for (let child = element.firstElementChild; child; child = child.nextElementSibling) visit(child);
+    for (let i = 0; i < element.childNodes.length; i++) {
+      const child = element.childNodes.item(i);
+      if (child && child.nodeType === 1) visit(child as SvgElement);
+    }
   };
 
   visit(root);
