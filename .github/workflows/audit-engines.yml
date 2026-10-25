@@ -1,0 +1,88 @@
+name: Audit Engine Scans
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_repository:
+        description: Public repository to scan (owner/repository)
+        required: true
+        type: string
+        default: TomasThrawat/flutter-foundry
+      target_ref:
+        description: Branch, tag, or commit to scan
+        required: true
+        type: string
+        default: main
+      engine:
+        description: Scanner to run
+        required: true
+        type: choice
+        options: [all, trivy, gitleaks, semgrep, osv-scanner, zizmor, ruff, shellcheck, biome]
+        default: all
+
+permissions:
+  contents: read
+concurrency:
+  group: audit-${{ github.event.pull_request.number || inputs.target_repository || github.repository }}
+  cancel-in-progress: false
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      TARGET_REPOSITORY: ${{ github.event_name == 'workflow_dispatch' && inputs.target_repository || github.event.pull_request.head.repo.full_name || github.repository }}
+      TARGET_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.target_ref || github.event.pull_request.head.sha || github.sha }}
+      AUDIT_ENGINE: ${{ github.event_name == 'workflow_dispatch' && inputs.engine || 'all' }}
+    steps:
+      - name: Check out trusted scanner code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: tooling
+          persist-credentials: false
+      - name: Validate target repository and reference
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$TARGET_REPOSITORY" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$ ]] || [[ "$TARGET_REPOSITORY" == *".."* ]]; then
+            echo "Invalid repository. Expected owner/repository."
+            exit 1
+          fi
+          if [[ ! "$TARGET_REF" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$ ]] || [[ "$TARGET_REF" == *".."* ]] || [[ "$TARGET_REF" == *"//"* ]] || [[ "$TARGET_REF" == */ ]] || [[ "$TARGET_REF" == *".lock" ]]; then
+            echo "Invalid target ref."
+            exit 1
+          fi
+          visibility="$(gh api "repos/$TARGET_REPOSITORY" --jq '.visibility')"
+          if [[ "$visibility" != "public" ]]; then
+            echo "Only public repositories can be scanned by this workflow."
+            exit 1
+          fi
+          echo "Scanning public repository: $TARGET_REPOSITORY@$TARGET_REF"
+          echo "Requested engine: $AUDIT_ENGINE"
+      - name: Check out target source without credentials
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TARGET_REPOSITORY }}
+          ref: ${{ env.TARGET_REF }}
+          path: target
+          persist-credentials: false
+      - name: Run selected scanners
+        shell: bash
+        run: bash tooling/.github/scripts/run-audit.sh target
+        env:
+          AUDIT_ENGINE: ${{ env.AUDIT_ENGINE }}
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report-${{ github.run_id }}
+          path: ${{ runner.temp }}/flutter-foundry-audit-reports/
+          if-no-files-found: warn
+          retention-days: 7
