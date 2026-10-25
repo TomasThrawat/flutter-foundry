@@ -1,1 +1,178 @@
-#!/usr/bin/env bash\nset -uo pipefail\nTARGET_DIR="${1:-target}"\nENGINE="${AUDIT_ENGINE:-all}"\nREPORT_DIR="$RUNNER_TEMP/flutter-foundry-audit-reports"\nSUMMARY_FILE="$REPORT_DIR/results.tsv"\nmkdir -p "$REPORT_DIR"\n: > "$SUMMARY_FILE"\n\nif [[ ! -d "$TARGET_DIR" ]]; then\n  echo "Target directory does not exist: $TARGET_DIR" >&2\n  exit 2\nfi\n\nrun_scan() {\n  local name="$1"\n  shift\n  local log="$REPORT_DIR/$name.log"\n  local code=0\n  printf 'Running %s...\n' "$name"\n  "$@" >"$log" 2>&1 || code=$?\n  printf '%s\t%s\n' "$name" "$code" >> "$SUMMARY_FILE"\n  if [[ "$code" -eq 0 ]]; then\n    printf '%s completed (exit 0).\n' "$name"\n  else\n    printf '%s exited %s. This can mean findings or scanner/setup problems; inspect its report.\n' "$name" "$code"\n  fi\n  return 0\n}\n\nrun_scan_json() {\n  local name="$1"\n  local report="$2"\n  shift 2\n  local log="$REPORT_DIR/$name.log"\n  local code=0\n  printf 'Running %s...\n' "$name"\n  "$@" >"$report" 2>"$log" || code=$?\n  printf '%s\t%s\n' "$name" "$code" >> "$SUMMARY_FILE"\n  if [[ "$code" -eq 0 ]]; then\n    printf '%s completed (exit 0).\n' "$name"\n  else\n    printf '%s exited %s. This can mean findings or scanner/setup problems; inspect %s and %s.\n' "$name" "$code" "$report" "$log"\n  fi\n  return 0\n}\n\nshould_run() { [[ "$ENGINE" == "all" || "$ENGINE" == "$1" ]]; }\n\nif should_run trivy; then\n  run_scan trivy docker run --rm \\n    -v "$PWD/$TARGET_DIR:/src:ro" \\n    -v "$REPORT_DIR:/out" \\n    aquasec/trivy:latest fs --scanners vuln,misconfig --skip-dirs .git \\n    --format json --output /out/trivy.json /src\nfi\n\nif should_run gitleaks; then\n  run_scan gitleaks docker run --rm \\n    -v "$PWD/$TARGET_DIR:/src:ro" \\n    -v "$REPORT_DIR:/out" \\n    ghcr.io/gitleaks/gitleaks:v8.30.1 dir \\n    --redact --report-format json --report-path /out/gitleaks.json /src\nfi\n\nif should_run semgrep; then\n  run_scan semgrep docker run --rm \\n    -v "$PWD/$TARGET_DIR:/src:ro" \\n    -v "$REPORT_DIR:/out" \\n    semgrep/semgrep:latest semgrep scan --config auto --json \\n    --output /out/semgrep.json /src\nfi\n\nif should_run osv-scanner; then\n  if find "$TARGET_DIR" -type f \( \\n    -name 'package-lock.json' -o -name 'pnpm-lock.yaml' -o -name 'yarn.lock' -o \\n    -name 'Cargo.lock' -o -name 'go.sum' -o -name 'go.mod' -o \\n    -name 'poetry.lock' -o -name 'Pipfile.lock' -o -name 'requirements*.txt' -o \\n    -name 'Gemfile.lock' -o -name 'composer.lock' -o -name 'pubspec.lock' -o \\n    -name 'mix.lock' -o -name 'pom.xml' -o -name 'gradle.lockfile' -o \\n    -name '*.spdx' -o -name '*.spdx.json' -o -name '*.cdx.json' -o \\n    -name 'bom.json' -o -name 'bom.xml' \) -print -quit | grep -q .; then\n    run_scan_json osv-scanner "$REPORT_DIR/osv-scanner.json" docker run --rm \\n      -v "$PWD/$TARGET_DIR:/src:ro" \\n      -v "$REPORT_DIR:/out" \\n      ghcr.io/google/osv-scanner:v2.3.3 scan source -r /src --format json\n  else\n    printf 'osv-scanner\tSKIPPED\n' >> "$SUMMARY_FILE"\n    printf '{"status":"skipped","reason":"No supported lockfile or SBOM was found."}\n' > "$REPORT_DIR/osv-scanner.json"\n    echo "Skipped: no supported lockfile or SBOM was found; package.json alone does not pin resolved dependency versions." > "$REPORT_DIR/osv-scanner.log"\n  fi\nfi\n\nif should_run zizmor; then\n  if [[ -d "$TARGET_DIR/.github/workflows" ]]; then\n    pipx install zizmor >/dev/null 2>&1 || true\n    if command -v zizmor >/dev/null 2>&1; then\n      run_scan zizmor zizmor "$TARGET_DIR/.github/workflows"\n    else\n      printf 'zizmor\t127\n' >> "$SUMMARY_FILE"\n      echo "zizmor could not be installed via pipx." > "$REPORT_DIR/zizmor.log"\n    fi\n  else\n    printf 'zizmor\t0\n' >> "$SUMMARY_FILE"\n    echo "No .github/workflows directory found; zizmor skipped." > "$REPORT_DIR/zizmor.log"\n  fi\nfi\n\nif should_run ruff; then\n  if find "$TARGET_DIR" -type f -name '*.py' -print -quit | grep -q .; then\n    pipx install ruff >/dev/null 2>&1 || true\n    if command -v ruff >/dev/null 2>&1; then\n      run_scan_json ruff "$REPORT_DIR/ruff.json" ruff check --output-format=json "$TARGET_DIR"\n    else\n      printf 'ruff\t127\n' >> "$SUMMARY_FILE"\n      echo "ruff could not be installed via pipx." > "$REPORT_DIR/ruff.log"\n    fi\n  else\n    printf 'ruff\t0\n' >> "$SUMMARY_FILE"\n    echo "No Python files found; ruff skipped." > "$REPORT_DIR/ruff.log"\n  fi\nfi\n\nif should_run shellcheck; then\n  if find "$TARGET_DIR" -type f -name '*.sh' -print -quit | grep -q .; then\n    sudo apt-get update >/dev/null 2>&1 && sudo apt-get install --yes shellcheck >/dev/null 2>&1\n    mapfile -d '' files < <(find "$TARGET_DIR" -type f -name '*.sh' -print0)\n    if command -v shellcheck >/dev/null 2>&1; then\n      run_scan_json shellcheck "$REPORT_DIR/shellcheck.json" shellcheck -f json "${files[@]}"\n    else\n      printf 'shellcheck\t127\n' >> "$SUMMARY_FILE"\n      echo "shellcheck could not be installed." > "$REPORT_DIR/shellcheck.log"\n    fi\n  else\n    printf 'shellcheck\t0\n' >> "$SUMMARY_FILE"\n    echo "No shell scripts found; ShellCheck skipped." > "$REPORT_DIR/shellcheck.log"\n  fi\nfi\n\nif should_run biome; then\n  if find "$TARGET_DIR" -type f \( -name '*.js' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' -o -name '*.json' -o -name '*.css' \) -print -quit | grep -q .; then\n    run_scan_json biome "$REPORT_DIR/biome.json" npm exec --yes --package=@biomejs/biome -- biome check "$TARGET_DIR" --reporter=json\n  else\n    printf 'biome\t0\n' >> "$SUMMARY_FILE"\n    echo "No supported JS/TS/JSON/CSS files found; Biome skipped." > "$REPORT_DIR/biome.log"\n  fi\nfi\n\npython3 - "$SUMMARY_FILE" "$REPORT_DIR" "$TARGET_REPOSITORY" "$TARGET_REF" "$ENGINE" > "$REPORT_DIR/summary.md" <<'PY'\nimport json, os, sys\nsummary_file, report_dir, repository, ref, engine = sys.argv[1:]\ndef read_json(name):\n    try:\n        with open(os.path.join(report_dir, name), encoding="utf-8") as f:\n            return json.load(f)\n    except (OSError, ValueError):\n        return None\nrows = []\nwith open(summary_file, encoding="utf-8") as f:\n    for line in f:\n        fields = line.rstrip("\n").split("\t", 1)\n        if len(fields) == 2:\n            rows.append(fields)\ndetails = {}\ntrivy = read_json("trivy.json")\nif isinstance(trivy, dict):\n    results = trivy.get("Results") or []\n    vulns = sum(len(r.get("Vulnerabilities") or []) for r in results if isinstance(r, dict))\n    misconfigs = sum(len(r.get("Misconfigurations") or []) for r in results if isinstance(r, dict))\n    details["trivy"] = f"{vulns} vulnerabilities; {misconfigs} misconfigurations"\ngitleaks = read_json("gitleaks.json")\nif isinstance(gitleaks, list):\n    details["gitleaks"] = f"{len(gitleaks)} secret findings"\nsemgrep = read_json("semgrep.json")\nsemgrep_parser_errors = 0\nif isinstance(semgrep, dict):\n    findings = len(semgrep.get("results") or [])\n    errors = semgrep.get("errors") or []\n    semgrep_parser_errors = len(errors)\n    details["semgrep"] = f"{findings} findings; {len(errors)} scan/parser diagnostics"\nosv = read_json("osv-scanner.json")\nif isinstance(osv, dict) and osv.get("status") == "skipped":\n    details["osv-scanner"] = "skipped: no supported lockfile/SBOM"\nelif isinstance(osv, dict):\n    details["osv-scanner"] = "report generated; inspect JSON for package vulnerability details"\nbiome = read_json("biome.json")\nbiome_errors = 0\nif isinstance(biome, dict):\n    stat = biome.get("summary") or {}\n    biome_errors = int(stat.get("errors") or 0)\n    warnings = int(stat.get("warnings") or 0)\n    details["biome"] = f"{biome_errors} errors; {warnings} warnings"\nfor name in ("ruff", "shellcheck"):\n    data = read_json(name + ".json")\n    if isinstance(data, list):\n        details[name] = f"{len(data)} diagnostics"\n    elif data is not None:\n        details[name] = "machine-readable report generated"\nwith open(os.path.join(report_dir, "summary.md"), "a", encoding="utf-8") as f:\n    f.write("# Audit report\n\n")\n    f.write(f"- Target: {repository}@{ref}\n")\n    f.write(f"- Engine selection: {engine}\n")\n    f.write("- The workflow scans files without running target build scripts or dependency-install scripts.\n")\n    f.write("- Exit codes are not vulnerability verdicts; review scanner reports and diagnostic logs.\n\n")\n    f.write("| Scanner | Exit code/status | Summary |\n|---|---:|---|\n")\n    for name, code in rows:\n        if code == "SKIPPED":\n            status = "SKIPPED"\n        elif code != "0":\n            status = "non-zero (inspect report)"\n        elif name == "semgrep" and semgrep_parser_errors:\n            status = "partial scan (parser diagnostics)"\n        elif name == "biome" and biome_errors:\n            status = "lint diagnostics"\n        else:\n            status = "command completed"\n        detail = details.get(name, "see log/artifact")\n        f.write(f"| {name} | {status} | {detail} |\n")\n    f.write("\nInspect the individual JSON and log files for full details.\n")\nPY\n\ncat "$REPORT_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"\n\necho "Audit complete. Detailed logs and reports are in $REPORT_DIR."\nexit 0\n
+#!/usr/bin/env bash
+set -uo pipefail
+
+TARGET_DIR="${1:-target}"
+ENGINE="${AUDIT_ENGINE:-all}"
+REPORT_DIR="$RUNNER_TEMP/flutter-foundry-audit-reports"
+SUMMARY_FILE="$REPORT_DIR/results.tsv"
+
+mkdir -p "$REPORT_DIR"
+: > "$SUMMARY_FILE"
+
+if [[ ! -d "$TARGET_DIR" ]]; then
+  echo "Target directory does not exist: $TARGET_DIR" >&2
+  exit 2
+fi
+
+run_scan() {
+  local name="$1"
+  shift
+  local log="$REPORT_DIR/$name.log"
+  local code=0
+  printf 'Running %s...\n' "$name"
+  "$@" >"$log" 2>&1 || code=$?
+  printf '%s\t%s\n' "$name" "$code" >> "$SUMMARY_FILE"
+  if [[ "$code" -eq 0 ]]; then
+    printf '%s command completed (exit 0).\n' "$name"
+  else
+    printf '%s exited %s; inspect its report and log.\n' "$name" "$code"
+  fi
+  return 0
+}
+
+run_scan_json() {
+  local name="$1"
+  local report="$2"
+  shift 2
+  local log="$REPORT_DIR/$name.log"
+  local code=0
+  printf 'Running %s...\n' "$name"
+  "$@" >"$report" 2>"$log" || code=$?
+  printf '%s\t%s\n' "$name" "$code" >> "$SUMMARY_FILE"
+  if [[ "$code" -eq 0 ]]; then
+    printf '%s command completed (exit 0).\n' "$name"
+  else
+    printf '%s exited %s; inspect %s and %s.\n' "$name" "$code" "$report" "$log"
+  fi
+  return 0
+}
+
+should_run() { [[ "$ENGINE" == "all" || "$ENGINE" == "$1" ]]; }
+
+if should_run trivy; then
+  run_scan trivy docker run --rm \
+    -v "$PWD/$TARGET_DIR:/src:ro" \
+    -v "$REPORT_DIR:/out" \
+    aquasec/trivy:latest fs --scanners vuln,misconfig --skip-dirs .git \
+    --format json --output /out/trivy.json /src
+fi
+
+if should_run gitleaks; then
+  run_scan gitleaks docker run --rm \
+    -v "$PWD/$TARGET_DIR:/src:ro" \
+    -v "$REPORT_DIR:/out" \
+    ghcr.io/gitleaks/gitleaks:v8.30.1 dir \
+    --redact --report-format json --report-path /out/gitleaks.json /src
+fi
+
+if should_run semgrep; then
+  run_scan semgrep docker run --rm \
+    -v "$PWD/$TARGET_DIR:/src:ro" \
+    -v "$REPORT_DIR:/out" \
+    semgrep/semgrep:latest semgrep scan --config auto --json \
+    --output /out/semgrep.json /src
+fi
+
+if should_run osv-scanner; then
+  if find "$TARGET_DIR" -type f \( \
+    -name 'package-lock.json' -o -name 'pnpm-lock.yaml' -o -name 'yarn.lock' -o \
+    -name 'Cargo.lock' -o -name 'go.sum' -o -name 'go.mod' -o \
+    -name 'poetry.lock' -o -name 'Pipfile.lock' -o -name 'requirements*.txt' -o \
+    -name 'Gemfile.lock' -o -name 'composer.lock' -o -name 'pubspec.lock' -o \
+    -name 'mix.lock' -o -name 'pom.xml' -o -name 'gradle.lockfile' -o \
+    -name '*.spdx' -o -name '*.spdx.json' -o -name '*.cdx.json' -o \
+    -name 'bom.json' -o -name 'bom.xml' \) -print -quit | grep -q .; then
+    run_scan_json osv-scanner "$REPORT_DIR/osv-scanner.json" docker run --rm \
+      -v "$PWD/$TARGET_DIR:/src:ro" \
+      -v "$REPORT_DIR:/out" \
+      ghcr.io/google/osv-scanner:v2.3.3 scan source -r /src --format json
+  else
+    printf 'osv-scanner\tSKIPPED\n' >> "$SUMMARY_FILE"
+    printf '{"status":"skipped","reason":"No supported lockfile or SBOM was found."}\n' > "$REPORT_DIR/osv-scanner.json"
+    echo "Skipped: no supported lockfile or SBOM was found; package.json alone does not pin resolved dependency versions." > "$REPORT_DIR/osv-scanner.log"
+  fi
+fi
+
+if should_run zizmor; then
+  if [[ -d "$TARGET_DIR/.github/workflows" ]]; then
+    pipx install zizmor >/dev/null 2>&1 || true
+    if command -v zizmor >/dev/null 2>&1; then
+      run_scan zizmor zizmor "$TARGET_DIR/.github/workflows"
+    else
+      printf 'zizmor\t127\n' >> "$SUMMARY_FILE"
+      echo "zizmor could not be installed via pipx." > "$REPORT_DIR/zizmor.log"
+    fi
+  else
+    printf 'zizmor\tSKIPPED\n' >> "$SUMMARY_FILE"
+    echo "No .github/workflows directory found; zizmor skipped." > "$REPORT_DIR/zizmor.log"
+  fi
+fi
+
+if should_run ruff; then
+  if find "$TARGET_DIR" -type f -name '*.py' -print -quit | grep -q .; then
+    pipx install ruff >/dev/null 2>&1 || true
+    if command -v ruff >/dev/null 2>&1; then
+      run_scan_json ruff "$REPORT_DIR/ruff.json" ruff check --output-format=json "$TARGET_DIR"
+    else
+      printf 'ruff\t127\n' >> "$SUMMARY_FILE"
+      echo "ruff could not be installed via pipx." > "$REPORT_DIR/ruff.log"
+    fi
+  else
+    printf 'ruff\tSKIPPED\n' >> "$SUMMARY_FILE"
+    echo "No Python files found; Ruff skipped." > "$REPORT_DIR/ruff.log"
+  fi
+fi
+
+if should_run shellcheck; then
+  if find "$TARGET_DIR" -type f -name '*.sh' -print -quit | grep -q .; then
+    sudo apt-get update >/dev/null 2>&1 && sudo apt-get install --yes shellcheck >/dev/null 2>&1
+    mapfile -d '' files < <(find "$TARGET_DIR" -type f -name '*.sh' -print0)
+    if command -v shellcheck >/dev/null 2>&1; then
+      run_scan_json shellcheck "$REPORT_DIR/shellcheck.json" shellcheck -f json "${files[@]}"
+    else
+      printf 'shellcheck\t127\n' >> "$SUMMARY_FILE"
+      echo "shellcheck could not be installed." > "$REPORT_DIR/shellcheck.log"
+    fi
+  else
+    printf 'shellcheck\tSKIPPED\n' >> "$SUMMARY_FILE"
+    echo "No shell scripts found; ShellCheck skipped." > "$REPORT_DIR/shellcheck.log"
+  fi
+fi
+
+if should_run biome; then
+  if find "$TARGET_DIR" -type f \( -name '*.js' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' -o -name '*.json' -o -name '*.css' \) -print -quit | grep -q .; then
+    run_scan_json biome "$REPORT_DIR/biome.json" npm exec --yes --package=@biomejs/biome -- biome check "$TARGET_DIR" --reporter=json
+  else
+    printf 'biome\tSKIPPED\n' >> "$SUMMARY_FILE"
+    echo "No supported JS/TS/JSON/CSS files found; Biome skipped." > "$REPORT_DIR/biome.log"
+  fi
+fi
+
+{
+  echo "# Audit report"
+  echo
+  echo "- Target: $TARGET_REPOSITORY@$TARGET_REF"
+  echo "- Engine selection: $ENGINE"
+  echo "- The workflow scans source files without running target build scripts or dependency-install scripts."
+  echo "- Exit codes are not vulnerability verdicts: review each JSON report and diagnostic log."
+  echo
+  echo "| Scanner | Exit code/status |"
+  echo "|---|---:|"
+  while IFS=$'\t' read -r name code; do
+    [[ -n "${name:-}" ]] || continue
+    if [[ "$code" == "SKIPPED" ]]; then
+      status="SKIPPED (not applicable)"
+    elif [[ "$code" == "0" ]]; then
+      status="command completed"
+    else
+      status="non-zero (inspect report)"
+    fi
+    echo "| $name | $status |"
+  done < "$SUMMARY_FILE"
+  echo
+  echo "Download the artifact for each scanner's log and machine-readable report."
+} > "$REPORT_DIR/summary.md"
+
+cat "$REPORT_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
+echo "Audit complete. Detailed reports are in $REPORT_DIR."
+exit 0
