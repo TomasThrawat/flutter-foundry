@@ -94,7 +94,7 @@ const handler = createMcpHandler((server) => {
       `          channel: ${flutterChannel}`, "          cache: true", "      - run: flutter --version", "      - run: flutter pub get",
       "      - run: dart format --output=none --set-exit-if-changed .", "      - run: flutter analyze --fatal-infos", "      - run: flutter test --coverage",
       ...(buildAndroid ? ["      - run: flutter build apk --release", "      - uses: actions/upload-artifact@v4", "        with:", "          name: flutter-release-apk", "          path: build/app/outputs/flutter-apk/*.apk", "          if-no-files-found: error"] : [])
-    ].join("\\n") + "\\n",
+    ].join("\n") + "\n",
     notes: ["Save the returned YAML to .github/workflows/flutter-ci.yml.", "Review action versions and repository security policy before production use."]
   }));
 
@@ -155,7 +155,7 @@ const handler = createMcpHandler((server) => {
         { label: "APK/AAB signature evidence", regex: /signed|signature|signing certificate/i, recommendation: "Verify the final artifact using apksigner or bundletool; log mentions alone do not prove authenticity." },
         { label: "ABI evidence", regex: /arm64-v8a|armeabi-v7a|x86_64|abi/i, recommendation: "Confirm packaged native libraries match intended devices." },
         { label: "Minimum SDK evidence", regex: /minSdkVersion|minimum sdk|min sdk/i, recommendation: "Verify minSdk and targetSdk using actual manifest and Gradle outputs." },
-        { label: "Debug build risk", regex: /debuggable\\s*[:=]?\\s*true|debug build/i, recommendation: "Ensure release variant and merged manifest are correct." },
+        { label: "Debug build risk", regex: /debuggable\s*[:=]?\s*true|debug build/i, recommendation: "Ensure release variant and merged manifest are correct." },
         { label: "Sensitive permissions", regex: /READ_SMS|READ_CONTACTS|READ_PHONE_STATE|ACCESS_FINE_LOCATION|MANAGE_EXTERNAL_STORAGE/i, recommendation: "Review necessity, consent and platform policy for each sensitive permission." },
         { label: "Build failure", regex: /BUILD FAILED|FAILURE: Build failed/i, recommendation: "Do not treat a partial artifact as a successful release." }
       ];
