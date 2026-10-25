@@ -20,12 +20,17 @@ export function isSafeGitHubRef(value: string): boolean {
 }
 type GitHubRun = { id: number; event: string; status: string; conclusion: string | null; created_at: string; html_url: string; head_branch: string; name: string };
 
-async function githubRequest(token: string, path: string, init?: RequestInit): Promise<{ status: number; data: any }> {
+async function githubRequest(token: string | undefined, path: string, init?: RequestInit): Promise<{ status: number; data: any }> {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    ...((init?.headers ?? {}) as Record<string, string>),
+  };
+  if (token) headers.Authorization = "Bearer " + token;
   const response = await fetch(API_ROOT + path, {
     ...init,
     signal: AbortSignal.timeout(8000),
-    headers: { Accept: "application/vnd.github+json", Authorization: "Bearer " + token,
-      "X-GitHub-Api-Version": "2022-11-28", ...(init?.headers ?? {}) },
+    headers,
   });
   const body = await response.text();
   let data: any = null;
@@ -60,7 +65,7 @@ export function registerGithubAuditTools(register: Registrar) {
         workflowUrl: WORKFLOW_URL,
       };
       const parts = targetRepository.split("/");
-      const metadata = await githubRequest(token, "/repos/" + encodeURIComponent(parts[0]) + "/" + encodeURIComponent(parts[1]));
+      const metadata = await githubRequest(undefined, "/repos/" + encodeURIComponent(parts[0]) + "/" + encodeURIComponent(parts[1]));
       if (metadata.status !== 200) throw apiError(metadata.status, metadata.data?.message);
       if (metadata.data?.visibility !== "public") return { status: "rejected", targetRepository, message: "Only public repositories can be scanned by this workflow.", workflowUrl: WORKFLOW_URL };
       if (metadata.data?.archived) return { status: "rejected", targetRepository, message: "The target repository is archived. Select an active public repository.", workflowUrl: WORKFLOW_URL };
