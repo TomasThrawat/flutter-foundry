@@ -5,7 +5,7 @@
   "description": "Open-source Flutter engineering MCP with SVG-Edit + Playwright icon workflow.",
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.9.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -17,24 +17,31 @@
     "test:svg-edit": "playwright test tests/svg-edit.integration.spec.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "^2.4.0",
     "@sparticuz/chromium": "^138.0.2",
-    "@xmldom/xmldom": "^0.9.8",
-    "mcp-handler": "^1.0.5",
-    "next": "^15.2.6",
+    "@xmldom/xmldom": "^0.9.12",
+    "mcp-handler": "^2.3.0",
+    "next": "^16.4.3",
     "playwright-core": "^1.54.2",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "zod": "^3.25.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",
     "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^15.2.6",
+    "eslint-config-next": "^16.4.3",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
     "@eslint/eslintrc": "^3.3.1"
+  },
+  "overrides": {
+    "postcss": "^8.5.23",
+    "postcss-selector-parser@^6.0.0": "^6.1.5",
+    "postcss-selector-parser@^7.0.0": "^7.1.7"
   }
 }
