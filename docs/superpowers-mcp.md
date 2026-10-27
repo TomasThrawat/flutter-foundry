@@ -7,7 +7,7 @@ Flutter Foundry now exposes the upstream [obra/superpowers](https://github.com/o
 - Main Flutter Foundry MCP: /mcp (includes these tools alongside the existing Flutter and security tools).
 - Standalone Superpowers-only MCP: /api/superpowers-mcp.
 
-Both endpoints share the existing optional MCP_API_TOKEN bearer-token protection. If that environment variable is set, clients must send Authorization: Bearer <token>.
+Both endpoints are intentionally no-auth: requests to /mcp and /api/superpowers-mcp do not require an Authorization header or token. Anyone who can reach a public deployment can use the tools; do not send private or sensitive data to these endpoints.
 
 ## Tools
 

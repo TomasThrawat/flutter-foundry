@@ -249,11 +249,5 @@ const handler = createMcpHandler((server) => {
   registerSuperpowersTools(register);
 });
 
-function authorize(request: Request): Response | null {
-  const token = process.env.MCP_API_TOKEN;
-  if (!token) return null;
-  if (request.headers.get("authorization") !== `Bearer ${token}`) return new Response("Unauthorized", { status: 401 });
-  return null;
-}
-export async function GET(request: Request) { return authorize(request) || handler(request); }
-export async function POST(request: Request) { return authorize(request) || handler(request); }
+export async function GET(request: Request) { return handler(request); }
+export async function POST(request: Request) { return handler(request); }

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   SUPERPOWERS_COMMIT,
   SUPERPOWERS_REPOSITORY,
@@ -158,4 +159,18 @@ test("tool registrar adds all six tools and their local handlers are usable", as
     skills: ["systematic-debugging"],
   });
   assert.equal((invalid as ReturnType<typeof validateSuperpowersWorkflow>).valid, false);
+});
+
+
+test("main and standalone MCP endpoints are intentionally no-auth", async () => {
+  const [mainRoute, standaloneRoute] = await Promise.all([
+    readFile("app/mcp/route.ts", "utf8"),
+    readFile("app/api/superpowers-mcp/route.ts", "utf8"),
+  ]);
+
+  for (const route of [mainRoute, standaloneRoute]) {
+    assert.doesNotMatch(route, /MCP_API_TOKEN|function authorize|return new Response\(["']Unauthorized["']/);
+    assert.match(route, /export async function GET\(request: Request\)\s*\{\s*return handler\(request\);\s*\}/);
+    assert.match(route, /export async function POST\(request: Request\)\s*\{\s*return handler\(request\);\s*\}/);
+  }
 });

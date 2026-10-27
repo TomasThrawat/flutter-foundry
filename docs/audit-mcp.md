@@ -2,6 +2,8 @@
 
 The existing Flutter Foundry MCP endpoint exposes a unified audit interface alongside Flutter engineering tools.
 
+The /mcp endpoint is intentionally no-auth. Anyone who can reach the deployment can call its tools. The GITHUB_AUDIT_TOKEN described below is a separate credential used only by the GitHub Actions dispatch tool; it does not authenticate MCP requests.
+
 ## MCP tools
 - flutter_audit_engine_catalog: list scanner catalog entries and integration limits.
 - flutter_audit_engine_status: probe installed local CLI tools without running a scan.

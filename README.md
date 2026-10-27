@@ -51,9 +51,10 @@ The SVG-Edit integration test contacts the official hosted editor and requires o
 
 1. Import this GitHub repository as a Next.js project.
 2. Use Node.js 22 or newer; enable Fluid Compute if available.
-3. Set MCP_API_TOKEN to a long random value to require bearer authentication on /mcp.
-4. Set ICON_API_TOKEN to protect the browser-heavy /api/icons/edit endpoint.
-5. Keep SVG_EDIT_URL at its official default unless you intentionally configure a trusted compatible build.
+**MCP access is intentionally no-auth:** /mcp and /api/superpowers-mcp do not require a token. Anyone who can reach the deployment can call them; do not treat these endpoints as private.
+
+3. Set ICON_API_TOKEN to protect the browser-heavy /api/icons/edit endpoint.
+4. Keep SVG_EDIT_URL at its official default unless you intentionally configure a trusted compatible build.
 
 The Playwright call can take tens of seconds because it starts Chromium and loads a remote editor. Verify serverless duration and memory limits on the selected plan.
 
