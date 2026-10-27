@@ -22,16 +22,16 @@ case "$(uname -s):$(uname -m)" in
 esac
 for dep in curl tar sha256sum python3 npm; do command -v "$dep" >/dev/null; done
 
-# Create a lockfile only in the disposable CI checkout when none exists.
+# Create a lockfile only in the disposable CI checkout if no lockfile exists.
 if [[ -f package.json && ! -f package-lock.json && ! -f npm-shrinkwrap.json && ! -f pnpm-lock.yaml && ! -f yarn.lock ]]; then
-  echo "No lockfile found; resolving one in the temporary checkout for dependency scanning."
+  echo "No lockfile found; resolving one in the temporary CI checkout for dependency scanning."
   npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 fi
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-echo "Installing Trivy v${TRIVY_VERSION} and verifying the upstream checksum."
+echo "Installing Trivy v${TRIVY_VERSION} and verifying the checksum published with its release."
 TRIVY_ASSET="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
 curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${TRIVY_ASSET}" -o "$TMP_DIR/$TRIVY_ASSET"
 curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_checksums.txt" -o "$TMP_DIR/trivy-checksums.txt"
@@ -39,7 +39,7 @@ curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VER
 tar -xzf "$TMP_DIR/$TRIVY_ASSET" -C "$TMP_DIR" trivy
 install -m 0755 "$TMP_DIR/trivy" "$BIN_DIR/trivy"
 
-echo "Installing Gitleaks v${GITLEAKS_VERSION} and verifying the upstream SHA-256."
+echo "Installing Gitleaks v${GITLEAKS_VERSION} and verifying its release SHA-256."
 GITLEAKS_ASSET="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
 curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_ASSET}" -o "$TMP_DIR/$GITLEAKS_ASSET"
 (cd "$TMP_DIR" && printf '%s  %s\n' "$GITLEAKS_SHA256" "$GITLEAKS_ASSET" | sha256sum -c -)
@@ -77,12 +77,14 @@ run_check() {
   fi
 }
 
-run_check "Trivy: HIGH/CRITICAL dependency, configuration, and secret findings" \
+# Trivy does not scan secrets here so actual secret values are not printed into CI logs.
+# Gitleaks runs with --redact below for the secret-scanning job.
+run_check "Trivy: HIGH/CRITICAL dependency vulnerabilities and misconfigurations" \
   "$BIN_DIR/trivy" fs --cache-dir "$CACHE_DIR/trivy" \
   --skip-dirs node_modules --skip-dirs .next \
-  --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --no-progress .
+  --scanners vuln,misconfig --severity HIGH,CRITICAL --exit-code 1 --no-progress .
 
-run_check "Gitleaks: committed secrets" \
+run_check "Gitleaks: committed secrets (redacted output)" \
   "$BIN_DIR/gitleaks" git --redact --exit-code 1 --no-banner .
 
 run_check "Semgrep Community: security-audit ERROR findings" \
@@ -94,8 +96,9 @@ run_check "OSV-Scanner: dependency vulnerabilities" \
 
 if [[ "$FAILED" -ne 0 ]]; then
   echo
-  echo "Security gate failed; review all scanner results above."
+  echo "Security gate failed; review each scanner's output above."
   exit 1
 fi
+
 echo
 echo "All four scanners completed without blocking findings."

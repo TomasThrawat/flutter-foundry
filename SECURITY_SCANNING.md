@@ -1,27 +1,24 @@
 # Flutter Foundry security scanning
 
-Flutter Foundry includes four free/open-source security scanners:
+Flutter Foundry's active CI workflow installs and runs four free/open-source scanners:
 
-- **Trivy** checks the repository filesystem for HIGH/CRITICAL dependency vulnerabilities and misconfigurations.
-- **Gitleaks** checks the checked-out Git history for committed credentials and redacts finding output.
-- **Semgrep Community CLI** runs the public `p/security-audit` rules and blocks on ERROR-severity findings.
-- **OSV-Scanner** checks dependency manifests and lockfiles against the public OSV vulnerability database.
+- **Trivy 0.74.0** checks repository dependencies and configuration for HIGH/CRITICAL vulnerabilities and misconfigurations.
+- **Gitleaks 8.30.1** scans the checked-out Git history for committed credentials and redacts secret findings.
+- **Semgrep Community CLI 1.180.0** runs the public `p/security-audit` rules and blocks on ERROR-severity findings.
+- **OSV-Scanner 2.7.0** checks manifests and lockfiles against the public OSV vulnerability database.
 
-## CI integration
+## Execution order
 
-The shared script is `.circleci/security-scan.sh`.
+The project’s active CircleCI pipeline definition uses `.github/workflows/ci.yml`. Its `security-scan` job downloads pinned scanner releases, verifies Trivy's published checksum and Gitleaks' release SHA-256, then runs all four scanners. The existing `checks` and `svg-edit-browser` jobs both depend on `security-scan`, so tests, production build, and browser tests are skipped if a scanner reports a blocking finding.
 
-- `.github/workflows/security-gate.yml` runs scanner checks first, then runs lint, typecheck, tests, and production build only when scans pass. Flutter Foundry's current CircleCI project is using CircleCI's GitHub Actions runner integration, which is why this workflow is included alongside the native configuration.
-- `.circleci/config.yml` provides the equivalent sequence for a project using native CircleCI configuration.
+The checks run in an ephemeral CI worker. No paid API credentials are used; network access is needed to download releases, resolve Semgrep's public rules, and query vulnerability data. The workflow does not install native scanner binaries into the deployed Vercel serverless runtime.
 
-The scanner script installs pinned upstream releases into the temporary CI worker. It verifies Trivy using the checksum file published with its official release and verifies Gitleaks using its upstream SHA-256. Semgrep runs in a temporary Python virtual environment. The pipeline needs network access to download scanners, Semgrep's public rules, and vulnerability databases. No paid API keys are used.
-
-Run it manually from a Linux x86_64 checkout with curl, tar, sha256sum, Python 3 with venv, and Node/npm:
+For manual local/CI use on Linux x86_64 with curl, tar, sha256sum, Python 3 with venv, and Node/npm:
 
 ```bash
 bash .circleci/security-scan.sh
 ```
 
-The scanner job attempts all four scanners before failing the gate, so logs show each scanner's result. Findings should be reviewed and fixed rather than hidden with blanket ignores. Each scanner and Semgrep ruleset remains subject to its respective upstream license and terms.
+Scanner reports appear in the job logs. Review findings and fix them rather than adding broad ignores. Upstream licenses and any rule-pack terms remain applicable.
 
-**Deployment note:** a passing security workflow gates the test/build job inside that workflow. It does not automatically block Vercel's separate production deployment unless deployment protection or a required status check is configured to enforce it.
+**Deployment note:** this gates the test/build jobs in CircleCI. It does not automatically prevent Vercel from deploying from Git unless the Vercel/Git deployment policy is separately configured to require the relevant check.
