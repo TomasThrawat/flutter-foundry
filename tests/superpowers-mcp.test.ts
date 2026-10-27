@@ -40,7 +40,7 @@ test("loading a skill fetches its SKILL.md from the pinned upstream commit", asy
     return response("---\nname: test-driven-development\n---\nUse red-green-refactor.");
   });
   const result = await getSuperpowersSkill("test-driven-development", fetcher);
-  assert.ok(requestedUrl.includes(SUPERPOWERS_REPOSITORY.replace("/", "\\/")));
+  assert.ok(requestedUrl.includes(SUPERPOWERS_REPOSITORY));
   assert.ok(requestedUrl.includes(SUPERPOWERS_COMMIT));
   assert.equal(result.skill.slug, "test-driven-development");
   assert.match(result.content, /red-green-refactor/);
