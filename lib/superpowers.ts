@@ -183,7 +183,10 @@ export async function getSuperpowersSkillFile(
 ) {
   assertSkillSlug(slug);
   const relativePath = normalizeSkillFilePath(filePath);
-  if (relativePath === "SKILL.md") return getSuperpowersSkill(slug, fetcher);
+  if (relativePath === "SKILL.md") {
+    const result = await getSuperpowersSkill(slug, fetcher);
+    return { ...result, path: "SKILL.md" };
+  }
 
   const path = "skills/" + slug + "/" + relativePath;
   const paths = await getTreePaths(fetcher);
