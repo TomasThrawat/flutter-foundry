@@ -5,8 +5,17 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-BIN_DIR="${HOME}/.local/bin"
-CACHE_DIR="${HOME}/.cache/flutter-foundry-security"
+case "$(uname -s):$(uname -m)" in
+  Linux:x86_64) ;;
+  *) echo "Unsupported host: $(uname -s) $(uname -m); Linux x86_64 is required." >&2; exit 2 ;;
+esac
+for dep in curl tar sha256sum python3; do command -v "$dep" >/dev/null; done
+
+# Install tools and cache into a writable per-job temporary directory.
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+BIN_DIR="$TMP_DIR/bin"
+CACHE_DIR="$TMP_DIR/cache"
 mkdir -p "$BIN_DIR" "$CACHE_DIR"
 export PATH="$BIN_DIR:$PATH"
 
@@ -14,15 +23,6 @@ TRIVY_VERSION="0.74.0"
 GITLEAKS_VERSION="8.30.1"
 OSV_SCANNER_VERSION="2.7.0"
 SEMGREP_VERSION="1.180.0"
-
-case "$(uname -s):$(uname -m)" in
-  Linux:x86_64) ;;
-  *) echo "Unsupported host: $(uname -s) $(uname -m); Linux x86_64 is required." >&2; exit 2 ;;
-esac
-for dep in curl tar sha256sum python3; do command -v "$dep" >/dev/null; done
-
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
 
 echo "Installing Trivy v${TRIVY_VERSION} and verifying the checksum published with its release."
 TRIVY_ASSET="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
