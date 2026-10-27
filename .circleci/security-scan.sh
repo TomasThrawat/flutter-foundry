@@ -9,7 +9,16 @@ case "$(uname -s):$(uname -m)" in
   Linux:x86_64) ;;
   *) echo "Unsupported host: $(uname -s) $(uname -m); Linux x86_64 is required." >&2; exit 2 ;;
 esac
-for dep in curl tar sha256sum python3; do command -v "$dep" >/dev/null; done
+for dep in curl tar sha256sum python3 npm; do command -v "$dep" >/dev/null; done
+
+# OSV-Scanner and Trivy need resolved JavaScript versions. Generate a temporary
+# lockfile only in this disposable CI checkout if the repository has no lockfile.
+# The legacy peer flag avoids the repository's existing peer-resolution conflict;
+# it does not change package.json or commit a generated lockfile.
+if [[ -f package.json && ! -f package-lock.json && ! -f npm-shrinkwrap.json && ! -f pnpm-lock.yaml && ! -f yarn.lock ]]; then
+  echo "No npm lockfile found; generating a CI-only lockfile for dependency scanning."
+  npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps
+fi
 
 # Install tools and cache into a writable per-job temporary directory.
 TMP_DIR="$(mktemp -d)"
@@ -84,8 +93,6 @@ run_check "Semgrep Community: security-audit ERROR findings" \
   "$SEMGREP" scan --config p/security-audit --severity ERROR --error --metrics=off \
   --exclude node_modules --exclude .next .
 
-# OSV-Scanner scans lockfiles/SBOMs when available and also supports package.json
-# manifests; manifest-only results are best-effort because ranges aren't resolved versions.
 run_check "OSV-Scanner: dependency vulnerabilities" \
   "$BIN_DIR/osv-scanner" scan source --recursive .
 
