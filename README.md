@@ -62,3 +62,11 @@ The Playwright call can take tens of seconds because it starts Chromium and load
 SVG input is limited to 250 KB, parsed as XML, and sanitized with a restricted element/attribute allowlist. Script elements, event handlers, external links, entity declarations, and embedded HTML are rejected or stripped. This is defense-in-depth, not a guarantee that all malicious SVGs are harmless. The browser tool only accepts the official SVG-Edit hosts; do not broaden this allowlist for arbitrary URLs.
 
 Static findings are advisory. The tools do not claim a Flutter build or device test succeeded unless that work was actually run.
+
+## Superpowers MCP integration
+
+- The existing /mcp endpoint now includes the official Superpowers skill tools.
+- A standalone Superpowers-only MCP endpoint is available at /api/superpowers-mcp.
+- Tools: list skills, load a skill, read a supporting file, search skill summaries, compose a workflow, and validate workflow guardrails.
+- Source is pinned to an immutable upstream Superpowers v7.0.1 commit. Skill files are fetched read-only, with path checks and request timeouts. See docs/superpowers-mcp.md.
+

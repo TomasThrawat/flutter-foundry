@@ -7,6 +7,7 @@ import { generateIconFromPrompt } from "@/lib/icon-generator";
 import { renderIconPng, validateCustomIconSvg } from "@/lib/icon-png";
 import { registerAuditTools } from "@/lib/audit-engines";
 import { registerGithubAuditTools } from "@/lib/github-audit-runner";
+import { registerSuperpowersTools } from "@/lib/superpowers";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -245,6 +246,7 @@ const handler = createMcpHandler((server) => {
   }));
   registerAuditTools(register);
   registerGithubAuditTools(register);
+  registerSuperpowersTools(register);
 });
 
 function authorize(request: Request): Response | null {
