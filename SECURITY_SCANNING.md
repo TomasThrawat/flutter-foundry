@@ -2,9 +2,9 @@
 
 Flutter Foundry's active CI workflow installs and runs four free/open-source scanners:
 
-- **Trivy 0.74.0** checks dependencies and repository configuration for HIGH/CRITICAL vulnerabilities and misconfigurations when supported files are present.
+- **Trivy 0.76.1** checks dependencies and repository configuration for HIGH/CRITICAL vulnerabilities and misconfigurations when supported files are present.
 - **Gitleaks 8.30.1** scans checked-out Git history for committed credentials with redacted findings.
-- **Semgrep Community CLI 1.180.0** runs the public `p/security-audit` rules and blocks on ERROR-severity findings.
+- **Semgrep Community CLI 1.182.1** runs the public `p/security-audit` rules and blocks on ERROR-severity findings.
 - **OSV-Scanner 2.7.0** checks supported dependency lockfiles and SBOMs against the public OSV vulnerability database.
 
 ## Execution order

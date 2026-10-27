@@ -6,8 +6,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 case "$(uname -s):$(uname -m)" in
-  Linux:x86_64) ;;
-  *) echo "Unsupported host: $(uname -s) $(uname -m); Linux x86_64 is required." >&2; exit 2 ;;
+ Linux:x86_64) ;;
+ *) echo "Unsupported host: $(uname -s) $(uname -m); Linux x86_64 is required." >&2; exit 2 ;;
 esac
 for dep in curl tar sha256sum python3 npm; do command -v "$dep" >/dev/null; done
 
@@ -27,14 +27,14 @@ export npm_config_cache="$NPM_CACHE_DIR"
 # The legacy peer flag avoids the existing peer-resolution conflict; neither
 # package.json nor a generated lockfile is committed by this job.
 if [[ -f package.json && ! -f package-lock.json && ! -f npm-shrinkwrap.json && ! -f pnpm-lock.yaml && ! -f yarn.lock ]]; then
-  echo "No npm lockfile found; generating a CI-only lockfile using a fresh, writable npm cache."
-  npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps
+ echo "No npm lockfile found; generating a CI-only lockfile using a fresh, writable npm cache."
+ npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps
 fi
 
-TRIVY_VERSION="0.74.0"
+TRIVY_VERSION="0.76.1"
 GITLEAKS_VERSION="8.30.1"
 OSV_SCANNER_VERSION="2.7.0"
-SEMGREP_VERSION="1.180.0"
+SEMGREP_VERSION="1.182.1"
 
 echo "Installing Trivy v${TRIVY_VERSION} and verifying the checksum published with its release."
 TRIVY_ASSET="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
@@ -72,37 +72,37 @@ echo "=== Scanner versions ==="
 
 FAILED=0
 run_check() {
-  local name="$1"; shift
-  echo
-  echo "=== $name ==="
-  if "$@"; then
-    echo "PASS: $name"
-  else
-    local rc=$?
-    echo "FAIL: $name (exit $rc)"
-    FAILED=1
-  fi
+ local name="$1"; shift
+ echo
+ echo "=== $name ==="
+ if "$@"; then
+ echo "PASS: $name"
+ else
+ local rc=$?
+ echo "FAIL: $name (exit $rc)"
+ FAILED=1
+ fi
 }
 
 run_check "Trivy: HIGH/CRITICAL dependency vulnerabilities and misconfigurations" \
-  "$BIN_DIR/trivy" fs --cache-dir "$CACHE_DIR/trivy" \
-  --skip-dirs node_modules --skip-dirs .next \
-  --scanners vuln,misconfig --severity HIGH,CRITICAL --exit-code 1 --no-progress .
+ "$BIN_DIR/trivy" fs --cache-dir "$CACHE_DIR/trivy" \
+ --skip-dirs node_modules --skip-dirs .next \
+ --scanners vuln,misconfig --severity HIGH,CRITICAL --exit-code 1 --no-progress .
 
 run_check "Gitleaks: committed secrets (redacted output)" \
-  "$BIN_DIR/gitleaks" git --redact --exit-code 1 --no-banner .
+ "$BIN_DIR/gitleaks" git --redact --exit-code 1 --no-banner .
 
 run_check "Semgrep Community: security-audit ERROR findings" \
-  "$SEMGREP" scan --config p/security-audit --severity ERROR --error --metrics=off \
-  --exclude node_modules --exclude .next .
+ "$SEMGREP" scan --config p/security-audit --severity ERROR --error --metrics=off \
+ --exclude node_modules --exclude .next .
 
 run_check "OSV-Scanner: dependency vulnerabilities" \
-  "$BIN_DIR/osv-scanner" scan source --recursive .
+ "$BIN_DIR/osv-scanner" scan source --recursive .
 
 if [[ "$FAILED" -ne 0 ]]; then
-  echo
-  echo "Security gate failed; review each scanner's output above."
-  exit 1
+ echo
+ echo "Security gate failed; review each scanner's output above."
+ exit 1
 fi
 
 echo
