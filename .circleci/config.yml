@@ -1,0 +1,52 @@
+version: 2.1
+
+jobs:
+  security-scan:
+    docker:
+      - image: cimg/node:24
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: Install prerequisites and run security scanners
+          no_output_timeout: 15m
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ca-certificates curl tar gzip python3 python3-venv
+            bash .circleci/security-scan.sh
+
+  test-and-build:
+    docker:
+      - image: cimg/node:24
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: Install Node dependencies
+          command: |
+            if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+              npm ci --no-audit --no-fund
+            else
+              npm install --no-audit --no-fund
+            fi
+      - run:
+          name: Lint
+          command: npm run lint --if-present
+      - run:
+          name: Typecheck
+          command: npm run typecheck --if-present
+      - run:
+          name: Tests
+          command: npm test --if-present
+      - run:
+          name: Production build
+          no_output_timeout: 15m
+          command: npm run build
+
+workflows:
+  security-before-build:
+    jobs:
+      - security-scan
+      - test-and-build:
+          requires:
+            - security-scan
