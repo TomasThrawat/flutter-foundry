@@ -11,22 +11,25 @@ case "$(uname -s):$(uname -m)" in
 esac
 for dep in curl tar sha256sum python3 npm; do command -v "$dep" >/dev/null; done
 
-# OSV-Scanner and Trivy need resolved JavaScript versions. Generate a temporary
-# lockfile only in this disposable CI checkout if the repository has no lockfile.
-# The legacy peer flag avoids the repository's existing peer-resolution conflict;
-# it does not change package.json or commit a generated lockfile.
-if [[ -f package.json && ! -f package-lock.json && ! -f npm-shrinkwrap.json && ! -f pnpm-lock.yaml && ! -f yarn.lock ]]; then
-  echo "No npm lockfile found; generating a CI-only lockfile for dependency scanning."
-  npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps
-fi
-
-# Install tools and cache into a writable per-job temporary directory.
+# Use per-job writable storage for all tools and npm cache. The runner's shared
+# ~/.npm cache has produced EACCES/EEXIST failures when resolving the manifest.
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 BIN_DIR="$TMP_DIR/bin"
 CACHE_DIR="$TMP_DIR/cache"
-mkdir -p "$BIN_DIR" "$CACHE_DIR"
+NPM_CACHE_DIR="$TMP_DIR/npm-cache"
+mkdir -p "$BIN_DIR" "$CACHE_DIR" "$NPM_CACHE_DIR"
 export PATH="$BIN_DIR:$PATH"
+export npm_config_cache="$NPM_CACHE_DIR"
+
+# OSV-Scanner and Trivy need resolved JavaScript versions. Generate a temporary
+# lockfile only in this disposable CI checkout if the repository has no lockfile.
+# The legacy peer flag avoids the existing peer-resolution conflict; neither
+# package.json nor a generated lockfile is committed by this job.
+if [[ -f package.json && ! -f package-lock.json && ! -f npm-shrinkwrap.json && ! -f pnpm-lock.yaml && ! -f yarn.lock ]]; then
+  echo "No npm lockfile found; generating a CI-only lockfile using a fresh, writable npm cache."
+  npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps
+fi
 
 TRIVY_VERSION="0.74.0"
 GITLEAKS_VERSION="8.30.1"
