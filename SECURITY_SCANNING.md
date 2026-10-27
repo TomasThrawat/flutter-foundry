@@ -2,23 +2,25 @@
 
 Flutter Foundry's active CI workflow installs and runs four free/open-source scanners:
 
-- **Trivy 0.74.0** checks repository dependencies and configuration for HIGH/CRITICAL vulnerabilities and misconfigurations.
+- **Trivy 0.74.0** checks the repository filesystem for HIGH/CRITICAL dependency vulnerabilities and misconfigurations.
 - **Gitleaks 8.30.1** scans the checked-out Git history for committed credentials and redacts secret findings.
 - **Semgrep Community CLI 1.180.0** runs the public `p/security-audit` rules and blocks on ERROR-severity findings.
-- **OSV-Scanner 2.7.0** checks manifests and lockfiles against the public OSV vulnerability database.
+- **OSV-Scanner 2.7.0** checks supported dependency manifests, lockfiles, and SBOMs against the public OSV vulnerability database.
 
 ## Execution order
 
-The project’s active CircleCI pipeline definition uses `.github/workflows/ci.yml`. Its `security-scan` job downloads pinned scanner releases, verifies Trivy's published checksum and Gitleaks' release SHA-256, then runs all four scanners. The existing `checks` and `svg-edit-browser` jobs both depend on `security-scan`, so tests, production build, and browser tests are skipped if a scanner reports a blocking finding.
+The active CircleCI pipeline definition uses `.github/workflows/ci.yml`. The `security-scan` job downloads pinned scanner releases and verifies Trivy and Gitleaks using checksum files published alongside the official releases. It then runs all four scanners. Existing `checks` and `svg-edit-browser` jobs depend on `security-scan`, so tests, production build, and browser tests do not start if a scanner reports a blocking finding.
 
-The checks run in an ephemeral CI worker. No paid API credentials are used; network access is needed to download releases, resolve Semgrep's public rules, and query vulnerability data. The workflow does not install native scanner binaries into the deployed Vercel serverless runtime.
+The scanner job does not attempt to generate or modify a lockfile. This is intentional: resolving a lockfile via npm had failed in CI due to an existing dependency-tree conflict before any scanner could run. OSV-Scanner can inspect `package.json` manifests, but manifest-only results are best-effort and less exact than results from a resolved lockfile; version ranges are not the same as installed versions. Adding and maintaining a committed lockfile is the stronger long-term dependency-scanning setup.
 
-For manual local/CI use on Linux x86_64 with curl, tar, sha256sum, Python 3 with venv, and Node/npm:
+The CI worker is ephemeral; no paid API credentials are used. Network access is needed for release downloads, Semgrep's public rules, and vulnerability data. The workflow does not install scanner binaries into the deployed Vercel runtime.
+
+For manual use on Linux x86_64 with curl, tar, sha256sum, Python 3 with venv, and network access:
 
 ```bash
 bash .circleci/security-scan.sh
 ```
 
-Scanner reports appear in the job logs. Review findings and fix them rather than adding broad ignores. Upstream licenses and any rule-pack terms remain applicable.
+Each scanner prints its results to CI logs. Review findings and fix them instead of adding broad ignores. Upstream licenses and rule-pack terms still apply.
 
-**Deployment note:** this gates the test/build jobs in CircleCI. It does not automatically prevent Vercel from deploying from Git unless the Vercel/Git deployment policy is separately configured to require the relevant check.
+**Deployment note:** the gate blocks test/build jobs in the CircleCI workflow. It does not independently block a separate Vercel deployment unless deployment policy requires the relevant CI check.
