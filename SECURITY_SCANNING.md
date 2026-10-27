@@ -2,25 +2,27 @@
 
 Flutter Foundry's active CI workflow installs and runs four free/open-source scanners:
 
-- **Trivy 0.74.0** checks dependencies and repository configuration for HIGH/CRITICAL vulnerabilities and misconfigurations when supported dependency files are present.
-- **Gitleaks 8.30.1** scans the checked-out Git history for committed credentials and redacts secret findings.
-- **Semgrep Community CLI 1.180.0** runs public `p/security-audit` rules and blocks on ERROR-severity findings.
+- **Trivy 0.74.0** checks dependencies and repository configuration for HIGH/CRITICAL vulnerabilities and misconfigurations when supported files are present.
+- **Gitleaks 8.30.1** scans checked-out Git history for committed credentials with redacted findings.
+- **Semgrep Community CLI 1.180.0** runs the public `p/security-audit` rules and blocks on ERROR-severity findings.
 - **OSV-Scanner 2.7.0** checks supported dependency lockfiles and SBOMs against the public OSV vulnerability database.
 
 ## Execution order
 
-The active CircleCI pipeline definition uses `.github/workflows/ci.yml`. The `security-scan` job downloads pinned scanner releases, verifies Trivy and Gitleaks using official release checksum files, then runs all four scanners. Existing `checks` and `svg-edit-browser` jobs depend on `security-scan`, so tests, production build, and browser tests do not start if a scanner reports a blocking finding.
+The active CircleCI pipeline definition consumes `.github/workflows/ci.yml`. The `security-scan` job downloads pinned scanner releases, verifies Trivy and Gitleaks with official release checksum files, then runs all four scanners. The existing `checks` and `svg-edit-browser` jobs depend on `security-scan`, so tests, the production build, and browser tests do not start until scans pass.
 
-This repository currently lacks an npm lockfile. For the security job only, the script generates `package-lock.json` in CircleCI's disposable checkout using `--package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps`, then scans that resolved dependency tree. The generated file is not committed and does not modify `package.json`. The compatibility flag is needed because plain lockfile generation encounters an existing npm peer-resolution conflict; it does not fix or conceal that underlying dependency issue in the application. The regular test/build job remains responsible for proving the actual application install and build work.
+This repository has no committed npm lockfile. The scanner job generates a lockfile in CircleCI's disposable checkout with `--package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps`, using its own writable npm cache, then scans the resolved dependency tree. The generated file is not committed and `package.json` is not changed by this step.
 
-The tools install into a writable per-job temporary directory; no paid API credentials are used. Network access is needed for release downloads, Semgrep's public rules, and vulnerability data. The workflow does not install scanner binaries into the deployed Vercel runtime.
+The application and browser jobs use `npm install --legacy-peer-deps` with a fresh per-job npm cache because plain `npm install` currently reports `@modelcontextprotocol/server@undefined` while resolving its peer dependency with `mcp-handler@2.3.0`. The published ranges `^2.4.0` and `^2.0.0` are otherwise compatible, and the scanner's isolated lockfile generation succeeds with the same flag. This is a compatibility workaround, not proof of application correctness: typechecking, dependency audit, tests, lint, production build, and Playwright still have to pass.
 
-For manual use on Linux x86_64 with curl, tar, sha256sum, Python 3 with venv, Node/npm, and network access:
+Scanner CLIs install in a writable per-job temporary directory. No paid API credentials are used. Network access is needed for release downloads, public Semgrep rules, and vulnerability data. Scanner binaries are not installed in the deployed Vercel runtime.
+
+Run the scanner on Linux x86_64 with curl, tar, sha256sum, Python 3 with venv, Node/npm, and network access:
 
 ```bash
 bash .circleci/security-scan.sh
 ```
 
-Each scanner prints its results to CI logs. Review findings and fix them instead of adding broad ignores. Upstream licenses and rule-pack terms still apply.
+Review findings and fix them rather than adding broad ignores. Each scanner and rule pack remains subject to its upstream license and terms.
 
-**Deployment note:** the gate blocks test/build jobs in the CircleCI workflow. It does not independently block a separate Vercel deployment unless deployment policy requires the relevant CI check.
+**Deployment note:** the scanner gate blocks test/build jobs in the CircleCI workflow. It does not independently block a separate Vercel deployment unless deployment policy requires the relevant CI check.

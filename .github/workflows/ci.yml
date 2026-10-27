@@ -43,7 +43,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.2.0
         with:
           node-version: 22
-      - run: npm install
+      - name: Install dependencies (known npm peer-resolution quirk)
+        run: npm install --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
       - name: Audit dependencies
         run: npm audit --audit-level=moderate
       - run: npm run typecheck
@@ -63,6 +64,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.2.0
         with:
           node-version: 22
-      - run: npm install
+      - name: Install dependencies (known npm peer-resolution quirk)
+        run: npm install --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
       - run: npx playwright install --with-deps chromium
       - run: npm run test:svg-edit
