@@ -4,6 +4,8 @@ import { chromium as playwrightChromium, type Browser } from "playwright-core";
 
 const DEFAULT_EDITOR_URL = "https://svgedit.netlify.app/index.html";
 const MAX_SVG_BYTES = 250_000;
+const MAX_SVG_ELEMENTS = 10_000;
+const MAX_SVG_DEPTH = 128;
 const ALLOWED_ELEMENTS = new Set([
   "svg", "g", "defs", "symbol", "title", "desc", "path", "rect", "circle", "ellipse",
   "line", "polyline", "polygon", "text", "tspan", "linearGradient", "radialGradient",
@@ -48,7 +50,16 @@ export function sanitizeSvgInput(svg: string): string {
   }
 
   type SvgElement = NonNullable<typeof root>;
-  const visit = (element: SvgElement) => {
+  const pending: Array<{ element: SvgElement; depth: number }> = [{ element: root, depth: 1 }];
+  let visitedElements = 0;
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current) continue;
+    const { element, depth } = current;
+    visitedElements += 1;
+    if (visitedElements > MAX_SVG_ELEMENTS) throw new Error("SVG contains too many elements.");
+    if (depth > MAX_SVG_DEPTH) throw new Error("SVG nesting exceeds the 128-level limit.");
+
     const tag = element.localName || element.nodeName;
     if (!ALLOWED_ELEMENTS.has(tag)) throw new Error("Unsupported SVG element: <" + tag + ">.");
     const remove: string[] = [];
@@ -67,18 +78,16 @@ export function sanitizeSvgInput(svg: string): string {
           lowerValue.includes("data:text/html") || lowerValue.includes("@import")) {
         throw new Error('Unsafe value in SVG attribute "' + name + '".');
       }
-      if (/url\s*\(/i.test(value) && !/url\(\s*["']?#[-\w:.]+["']?\s*\)/i.test(value)) {
+      if (/url\s*\(/i.test(value) && !/url\(\s*[\"']?#[-\w:.]+[\"']?\s*\)/i.test(value)) {
         throw new Error('External or unsupported URL reference in SVG attribute "' + name + '".');
       }
     }
     for (const name of remove) element.removeAttribute(name);
-    for (let i = 0; i < element.childNodes.length; i++) {
+    for (let i = element.childNodes.length - 1; i >= 0; i -= 1) {
       const child = element.childNodes.item(i);
-      if (child && child.nodeType === 1) visit(child as SvgElement);
+      if (child && child.nodeType === 1) pending.push({ element: child as SvgElement, depth: depth + 1 });
     }
-  };
-
-  visit(root);
+  }
   if (!root.getAttribute("xmlns")) root.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   if (!root.getAttribute("viewBox")) root.setAttribute("viewBox", "0 0 512 512");
   if (!root.getAttribute("width")) root.setAttribute("width", "512");
