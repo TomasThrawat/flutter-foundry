@@ -53,14 +53,14 @@ The SVG-Edit integration test contacts the official hosted editor and requires o
 2. Use Node.js 22 or newer; enable Fluid Compute if available.
 **MCP access is intentionally no-auth:** /mcp and /api/superpowers-mcp do not require a token. Anyone who can reach the deployment can call them; do not treat these endpoints as private.
 
-3. Set ICON_API_TOKEN to protect the browser-heavy /api/icons/edit endpoint.
+3. Set ICON_API_TOKEN to protect the browser-heavy REST /api/icons/edit endpoint. It does not gate the svgedit_process_svg tool exposed by the intentionally no-auth /mcp endpoint.
 4. Keep SVG_EDIT_URL at its official default unless you intentionally configure a trusted compatible build.
 
 The Playwright call can take tens of seconds because it starts Chromium and loads a remote editor. Verify serverless duration and memory limits on the selected plan.
 
 ## Security notes
 
-SVG input is limited to 250 KB, parsed as XML, and sanitized with a restricted element/attribute allowlist. Script elements, event handlers, external links, entity declarations, and embedded HTML are rejected or stripped. This is defense-in-depth, not a guarantee that all malicious SVGs are harmless. The browser tool only accepts the official SVG-Edit hosts; do not broaden this allowlist for arbitrary URLs.
+SVG input is limited to 250 KB, 10,000 elements, and 128 nesting levels, parsed as XML, and sanitized with a restricted element/attribute allowlist. Script elements, event handlers, external links, entity declarations, and embedded HTML are rejected or stripped. This is defense-in-depth, not a guarantee that all malicious SVGs are harmless. The browser tool only accepts the official SVG-Edit hosts; do not broaden this allowlist for arbitrary URLs.
 
 Static findings are advisory. The tools do not claim a Flutter build or device test succeeded unless that work was actually run.
 
