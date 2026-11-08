@@ -15,11 +15,12 @@ import {
 const sample = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect x="0" y="0" width="512" height="512" fill="#000000"/><path d="M140 80 H330 V420 H140 Z" fill="#ffffff"/><path d="M190 220 H280 M190 280 H280 M190 340 H280" fill="none" stroke="#000000" stroke-width="18" stroke-linecap="round"/></svg>';
 
 test("creates deterministic style variants with separate SVGs", () => {
-  const variants = generateIconVariants({ prompt: "white camera icon on black background", size: 256 });
+  const variants = generateIconVariants({ prompt: "white file folder with three horizontal lines on black background", size: 256 });
   assert.equal(variants.length, 4);
   assert.deepEqual(variants.map((item) => item.style), ["minimal", "geometric", "rounded", "outline"]);
   assert.ok(variants.every((item) => item.svgMarkup.startsWith("<svg")));
-  assert.notEqual(variants[0].svgMarkup, variants[1].svgMarkup);
+  assert.equal(new Set(variants.map((item) => item.svgMarkup)).size, 4);
+  assert.ok(variants.every((item) => (item.svgMarkup.match(/<line /g) || []).length >= 3));
 });
 
 test("prepares stable element IDs and applies a targeted change only to the selected element", () => {

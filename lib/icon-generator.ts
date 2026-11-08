@@ -158,7 +158,27 @@ export function generateIconFromPrompt(input:IconGenerationInput):IconGeneration
     rect(104,108,304,306,main,radius+3,edge,ew);rect(104,108,304,78,accent,radius+3);line(178,82,178,137,fg,18);line(334,82,334,137,fg,18);
     for(let r=0;r<3;r++)for(let c=0;c<4;c++)if(!((r===1&&c===2)||(r===2&&c===1)))circle(159+c*65,238+r*54,8,outline?fg:negative);
   } else if(concept==="folder"){
-    path("M78 160 H203 L241 202 H434 Q450 202 450 220 V360 Q450 380 430 380 H93 Q74 380 74 360 V181 Q74 160 78 160 Z",main,edge,ew);path("M76 231 H448","none",outline?fg:accent,13);
+    if(style==="rounded"){
+      path("M96 158 H198 Q218 158 232 174 L254 198 H416 Q448 198 448 230 V346 Q448 378 416 378 H96 Q64 378 64 346 V190 Q64 158 96 158 Z",main,edge,ew);
+    } else if(style==="geometric"){
+      poly("78,160 205,160 245,202 450,202 450,380 74,380 74,183",main,edge,ew);
+    } else if(style==="pixel"){
+      poly("78,160 206,160 206,192 240,192 240,224 448,224 448,384 74,384 74,192 78,192",main,edge,ew);
+    } else {
+      path("M78 160 H203 L241 202 H434 Q450 202 450 220 V360 Q450 380 430 380 H93 Q74 380 74 360 V181 Q74 160 78 160 Z",main,edge,ew);
+    }
+    if(style==="pixel"){
+      rect(166,258,180,11,outline?fg:negative);
+      rect(166,299,180,11,outline?fg:negative);
+      rect(166,340,180,11,outline?fg:negative);
+    } else {
+      const detailColor=outline?fg:negative;
+      const detailWidth=style==="geometric"?12:style==="rounded"?10:8;
+      line(166,267,346,267,detailColor,detailWidth);
+      line(166,308,346,308,detailColor,detailWidth);
+      line(166,349,346,349,detailColor,detailWidth);
+      if(style==="abstract")circle(375,243,9,accent);
+    }
   } else if(concept==="cart"){
     path("M78 112 H126 L165 306 H371 L418 172 H146","none",fg,23);line(166,306,376,306,accent,17);circle(207,370,23,accent);circle(354,370,23,accent);
   } else if(concept==="music"){
