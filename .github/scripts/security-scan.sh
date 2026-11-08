@@ -19,6 +19,16 @@ BIN_DIR="$TMP_DIR/bin"
 CACHE_DIR="$TMP_DIR/cache"
 NPM_CACHE_DIR="$TMP_DIR/npm-cache"
 mkdir -p "$BIN_DIR" "$CACHE_DIR" "$NPM_CACHE_DIR"
+
+download_release_asset() {
+  local url="$1"
+  local destination="$2"
+  curl --fail --show-error --location \
+    --retry 5 --retry-delay 3 --retry-all-errors --retry-max-time 240 \
+    --connect-timeout 20 --max-time 120 \
+    "$url" -o "$destination"
+}
+
 export PATH="$BIN_DIR:$PATH"
 export npm_config_cache="$NPM_CACHE_DIR"
 
@@ -31,6 +41,30 @@ if [[ -f package.json && ! -f package-lock.json && ! -f npm-shrinkwrap.json && !
  npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps
 fi
 
+# Reject only minimatch releases covered by the current security advisory.
+# Older 3.x consumers remain unchanged; affected releases are >=7 and <11.0.1.
+node <<'NODE'
+const fs = require('node:fs')
+const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'))
+const entries = Object.entries(lock.packages || {}).filter(([path]) =>
+  path === 'node_modules/minimatch' || path.endsWith('/node_modules/minimatch')
+)
+if (entries.length === 0) {
+  console.error('No minimatch entries found in package-lock.json; refusing an unverified dependency scan.')
+  process.exit(1)
+}
+for (const [path, pkg] of entries) console.log(`minimatch ${pkg.version} at ${path}`)
+const affected = entries.filter(([, pkg]) => {
+  const [major, minor, patch] = String(pkg.version).split('.').map(Number)
+  return major >= 7 && (major < 11 || (major === 11 && minor === 0 && patch < 1))
+})
+if (affected.length) {
+  console.error('Vulnerable minimatch versions remain in package-lock.json')
+  process.exit(1)
+}
+console.log('PASS: no advisory-affected minimatch versions in package-lock.json')
+NODE
+
 TRIVY_VERSION="0.76.1"
 GITLEAKS_VERSION="8.30.1"
 OSV_SCANNER_VERSION="2.7.0"
@@ -38,8 +72,8 @@ SEMGREP_VERSION="1.182.1"
 
 echo "Installing Trivy v${TRIVY_VERSION} and verifying the checksum published with its release."
 TRIVY_ASSET="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${TRIVY_ASSET}" -o "$TMP_DIR/$TRIVY_ASSET"
-curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_checksums.txt" -o "$TMP_DIR/trivy-checksums.txt"
+download_release_asset "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${TRIVY_ASSET}" "$TMP_DIR/$TRIVY_ASSET"
+download_release_asset "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_checksums.txt" "$TMP_DIR/trivy-checksums.txt"
 (cd "$TMP_DIR" && grep -F "$TRIVY_ASSET" trivy-checksums.txt | sha256sum -c -)
 tar -xzf "$TMP_DIR/$TRIVY_ASSET" -C "$TMP_DIR" trivy
 install -m 0755 "$TMP_DIR/trivy" "$BIN_DIR/trivy"
@@ -47,14 +81,14 @@ install -m 0755 "$TMP_DIR/trivy" "$BIN_DIR/trivy"
 echo "Installing Gitleaks v${GITLEAKS_VERSION} and verifying its official checksum."
 GITLEAKS_ASSET="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
 GITLEAKS_CHECKSUMS="gitleaks_${GITLEAKS_VERSION}_checksums.txt"
-curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_ASSET}" -o "$TMP_DIR/$GITLEAKS_ASSET"
-curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_CHECKSUMS}" -o "$TMP_DIR/$GITLEAKS_CHECKSUMS"
+download_release_asset "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_ASSET}" "$TMP_DIR/$GITLEAKS_ASSET"
+download_release_asset "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_CHECKSUMS}" "$TMP_DIR/$GITLEAKS_CHECKSUMS"
 (cd "$TMP_DIR" && grep -F "$GITLEAKS_ASSET" "$GITLEAKS_CHECKSUMS" | sha256sum -c -)
 tar -xzf "$TMP_DIR/$GITLEAKS_ASSET" -C "$TMP_DIR" gitleaks
 install -m 0755 "$TMP_DIR/gitleaks" "$BIN_DIR/gitleaks"
 
 echo "Installing OSV-Scanner v${OSV_SCANNER_VERSION} from Google's official release."
-curl -fsSL "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64" -o "$BIN_DIR/osv-scanner"
+download_release_asset "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64" "$BIN_DIR/osv-scanner"
 chmod 0755 "$BIN_DIR/osv-scanner"
 test -s "$BIN_DIR/osv-scanner"
 
