@@ -9,7 +9,7 @@ case "$(uname -s):$(uname -m)" in
  Linux:x86_64) ;;
  *) echo "Unsupported host: $(uname -s) $(uname -m); Linux x86_64 is required." >&2; exit 2 ;;
 esac
-for dep in curl tar sha256sum python3 npm; do command -v "$dep" >/dev/null; done
+for dep in curl tar sha256sum python3 npm docker; do command -v "$dep" >/dev/null; done
 
 # Use per-job writable storage for all tools and npm cache. The runner's shared
 # ~/.npm cache has produced EACCES/EEXIST failures when resolving the manifest.
@@ -70,6 +70,31 @@ GITLEAKS_VERSION="8.30.1"
 OSV_SCANNER_VERSION="2.7.0"
 SEMGREP_VERSION="1.182.1"
 
+# Official GHCR images pinned to immutable Linux/amd64 manifest digests.
+GITLEAKS_IMAGE="ghcr.io/gitleaks/gitleaks:v${GITLEAKS_VERSION}@sha256:b109bc5f8f76a38196a3e413704fc5b9e3c32360bce4e4b603bd6f45b3721dbb"
+OSV_SCANNER_IMAGE="ghcr.io/google/osv-scanner:v${OSV_SCANNER_VERSION}-amd64@sha256:d2c46aa2483c4e02759bc25f2224d28a5ceeb3dca5a1ecd1f569fbed83a626f0"
+
+if ! docker info >/dev/null 2>&1; then
+  echo "ERROR: Docker is required to run the pinned official scanner images, but the Docker daemon is unavailable." >&2
+  exit 2
+fi
+
+pull_pinned_image() {
+  local image="$1"
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if docker pull --platform linux/amd64 "$image"; then
+      return 0
+    fi
+    if [[ "$attempt" -lt 5 ]]; then
+      echo "Docker image pull failed (attempt $attempt/5); retrying in 5 seconds." >&2
+      sleep 5
+    fi
+  done
+  echo "ERROR: Could not pull pinned scanner image: $image" >&2
+  return 1
+}
+
 echo "Installing Trivy v${TRIVY_VERSION} from the official signed Debian repository."
 sudo apt-get install -y --no-install-recommends gnupg
 download_release_asset "https://aquasecurity.github.io/trivy-repo/deb/public.key" "$TMP_DIR/trivy-repo-public.key"
@@ -93,19 +118,29 @@ if [[ "$TRIVY_INSTALLED_VERSION" != "$TRIVY_VERSION" ]]; then
 fi
 install -m 0755 "$(command -v trivy)" "$BIN_DIR/trivy"
 
-echo "Installing Gitleaks v${GITLEAKS_VERSION} and verifying its official checksum."
-GITLEAKS_ASSET="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-GITLEAKS_CHECKSUMS="gitleaks_${GITLEAKS_VERSION}_checksums.txt"
-download_release_asset "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_ASSET}" "$TMP_DIR/$GITLEAKS_ASSET"
-download_release_asset "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_CHECKSUMS}" "$TMP_DIR/$GITLEAKS_CHECKSUMS"
-(cd "$TMP_DIR" && grep -F "$GITLEAKS_ASSET" "$GITLEAKS_CHECKSUMS" | sha256sum -c -)
-tar -xzf "$TMP_DIR/$GITLEAKS_ASSET" -C "$TMP_DIR" gitleaks
-install -m 0755 "$TMP_DIR/gitleaks" "$BIN_DIR/gitleaks"
+echo "Installing Gitleaks v${GITLEAKS_VERSION} from its official digest-pinned GHCR image."
+pull_pinned_image "$GITLEAKS_IMAGE"
+cat > "$BIN_DIR/gitleaks" <<EOF
+#!/usr/bin/env bash
+set -Eeuo pipefail
+exec docker run --rm --pull=never --platform linux/amd64 --network none \
+  --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -v "$ROOT_DIR:/repo:ro" -w /repo \
+  "$GITLEAKS_IMAGE" "\$@"
+EOF
+chmod 0755 "$BIN_DIR/gitleaks"
 
-echo "Installing OSV-Scanner v${OSV_SCANNER_VERSION} from Google's official release."
-download_release_asset "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64" "$BIN_DIR/osv-scanner"
+echo "Installing OSV-Scanner v${OSV_SCANNER_VERSION} from Google's official digest-pinned GHCR image."
+pull_pinned_image "$OSV_SCANNER_IMAGE"
+cat > "$BIN_DIR/osv-scanner" <<EOF
+#!/usr/bin/env bash
+set -Eeuo pipefail
+exec docker run --rm --pull=never --platform linux/amd64 \
+  --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -v "$ROOT_DIR:/src:ro" -w /src \
+  "$OSV_SCANNER_IMAGE" "\$@"
+EOF
 chmod 0755 "$BIN_DIR/osv-scanner"
-test -s "$BIN_DIR/osv-scanner"
 
 echo "Installing Semgrep Community CLI v${SEMGREP_VERSION} in an isolated Python venv."
 python3 -m venv "$TMP_DIR/semgrep-venv"
