@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import type { ChangeEvent } from "react";
 
 const sample = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#000000"/><path d="M150 82 H290 L366 158 V420 H150 Z" fill="#ffffff"/><path d="M290 82 V158 H366" fill="none" stroke="#000000" stroke-width="12" stroke-linejoin="round"/><path d="M205 236 H310 M205 280 H310 M205 324 H310" fill="none" stroke="#000000" stroke-width="18" stroke-linecap="round"/></svg>';
@@ -10,6 +10,48 @@ type Quality = { score: number; findings: Array<{ severity: string; code: string
 type ElementSummary = { id: string; tag: string; fill: string | null; stroke: string | null; label: string };
 type Variant = { style: string; svgMarkup: string; pngBase64: string; quality: Quality };
 type Version = { svg: string; label: string; createdAt: number };
+
+const HISTORY_STORAGE_KEY = "flutter-foundry-icon-history-v1";
+const HISTORY_CHANGE_EVENT = "flutter-foundry-icon-history-change";
+let fallbackHistorySnapshot = "[]";
+
+function getHistorySnapshot(): string {
+  if (typeof window === "undefined") return "[]";
+  try { return window.localStorage.getItem(HISTORY_STORAGE_KEY) ?? fallbackHistorySnapshot; }
+  catch { return fallbackHistorySnapshot; }
+}
+
+function getServerHistorySnapshot(): string { return "[]"; }
+
+function subscribeToHistory(onStoreChange: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(HISTORY_CHANGE_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(HISTORY_CHANGE_EVENT, onStoreChange);
+  };
+}
+
+function writeHistorySnapshot(versions: Version[]): boolean {
+  const snapshot = JSON.stringify(versions.slice(-30));
+  fallbackHistorySnapshot = snapshot;
+  let stored = true;
+  try { window.localStorage.setItem(HISTORY_STORAGE_KEY, snapshot); }
+  catch { stored = false; }
+  window.dispatchEvent(new Event(HISTORY_CHANGE_EVENT));
+  return stored;
+}
+
+function parseHistorySnapshot(snapshot: string): Version[] {
+  try {
+    const parsed = JSON.parse(snapshot) as Version[];
+    if (Array.isArray(parsed) && parsed.length && parsed.every((item) => typeof item.svg === "string" && typeof item.label === "string" && typeof item.createdAt === "number")) {
+      return parsed.slice(-30);
+    }
+  } catch { /* Invalid browser data falls back to the starter icon. */ }
+  return [{ svg: sample, label: "Starter", createdAt: 0 }];
+}
 
 async function requestPipeline(operation: string, payload: Record<string, unknown> = {}) {
   const response = await fetch("/api/icons/pipeline", {
@@ -60,51 +102,32 @@ export default function IconMakerPage() {
   const [editFill, setEditFill] = useState("#ffffff");
   const [editStroke, setEditStroke] = useState("");
   const [variants, setVariants] = useState<Variant[]>([]);
-  const [history, setHistory] = useState<Version[]>([{ svg: sample, label: "Starter", createdAt: 0 }]);
-  const [historyIndex, setHistoryIndex] = useState(0);
-  const [historyReady, setHistoryReady] = useState(false);
+  const historySnapshot = useSyncExternalStore(subscribeToHistory, getHistorySnapshot, getServerHistorySnapshot);
+  const history = useMemo(() => parseHistorySnapshot(historySnapshot), [historySnapshot]);
+  const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
+  const historyIndex = selectedHistoryIndex ?? history.length - 1;
   const [status, setStatus] = useState("Ready. Generate, import, edit or inspect an icon.");
   const [busy, setBusy] = useState(false);
   const [appName, setAppName] = useState("My App");
   const [packageName, setPackageName] = useState("com.example.app");
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("flutter-foundry-icon-history-v1");
-      if (saved) {
-        const parsed = JSON.parse(saved) as Version[];
-        if (Array.isArray(parsed) && parsed.length) {
-          setHistory(parsed.slice(-30));
-          setHistoryIndex(Math.min(parsed.length - 1, 29));
-          setSvg(parsed[parsed.length - 1].svg);
-        }
-      }
-    } catch { /* Ignore invalid or unavailable browser storage. */ }
-    finally { setHistoryReady(true); }
-  }, []);
-
-  useEffect(() => {
-    if (!historyReady) return;
-    try { localStorage.setItem("flutter-foundry-icon-history-v1", JSON.stringify(history.slice(-30))); }
-    catch { setStatus("Browser storage is full; current edits remain available in this tab."); }
-  }, [history, historyReady]);
-
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
   function saveVersion(nextSvg: string, label: string) {
-    const snapshot = { svg: nextSvg, label, createdAt: Date.now() };
+    const snapshot = { svg: nextSvg, label, createdAt: (history[history.length - 1]?.createdAt ?? 0) + 1 };
     const prefix = history.slice(0, historyIndex + 1);
     const next = [...prefix, snapshot].slice(-30);
-    setHistory(next);
-    setHistoryIndex(next.length - 1);
+    const stored = writeHistorySnapshot(next);
+    setSelectedHistoryIndex(next.length - 1);
     setSvg(nextSvg);
+    if (!stored) setStatus("Browser storage is unavailable; version history is kept in memory for this tab.");
   }
 
   function restoreVersion(index: number) {
     const version = history[index];
     if (!version) return;
-    setHistoryIndex(index);
+    setSelectedHistoryIndex(index);
     setSvg(version.svg);
     setPng("");
     setQuality(null);
@@ -339,7 +362,7 @@ export default function IconMakerPage() {
               {history.map((version, index) => <option key={version.createdAt + "-" + index} value={index}>{index + 1}. {version.label}</option>)}
             </select>
           </div>
-          <p className="small">Version history is stored locally in this browser, up to 30 snapshots. It is not uploaded to the server.</p>
+          <p className="small">Version history is kept in this browser, up to 30 snapshots. It is not uploaded to the server.</p>
         </section>
 
         <section className="card">
