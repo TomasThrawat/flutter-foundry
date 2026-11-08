@@ -58,6 +58,12 @@ curl -fsSL "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANN
 chmod 0755 "$BIN_DIR/osv-scanner"
 test -s "$BIN_DIR/osv-scanner"
 
+echo
+ echo "=== Dependency path for minimatch ==="
+ npm explain minimatch || true
+ npm ls minimatch --all || true
+ echo
+
 echo "Installing Semgrep Community CLI v${SEMGREP_VERSION} in an isolated Python venv."
 python3 -m venv "$TMP_DIR/semgrep-venv"
 "$TMP_DIR/semgrep-venv/bin/python" -m pip install --disable-pip-version-check "semgrep==${SEMGREP_VERSION}"
