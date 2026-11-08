@@ -109,7 +109,7 @@ export type IconQualityReport={
 export async function analyzeIconQuality(svgMarkup:string):Promise<IconQualityReport> {
   const prepared=prepareEditableSvg(svgMarkup),root=parseSvg(prepared.svgMarkup).root;
   const viewBox=(root.getAttribute("viewBox")||"0 0 512 512").trim().split(/[\s,]+/).map(Number);
-  if(viewBox.length!==4||viewBox.some((value)=>!Number.isFinite(value))||viewBox[2]<=0||viewBox[3]<=0)throw new Error("SVG viewBox must contain four valid positive dimensions.");
+  if(viewBox.length!==4||viewBox.some((value:number)=>!Number.isFinite(value))||viewBox[2]<=0||viewBox[3]<=0)throw new Error("SVG viewBox must contain four valid positive dimensions.");
   const vw=viewBox[2],vh=viewBox[3];
   const rendered=await sharp(Buffer.from(prepared.svgMarkup)).resize(256,256,{fit:"contain",background:{r:0,g:0,b:0,alpha:0}}).ensureAlpha().raw().toBuffer({resolveWithObject:true});
   const data=rendered.data,info=rendered.info,counts=new Map<string,number>();
@@ -142,9 +142,9 @@ export async function analyzeIconQuality(svgMarkup:string):Promise<IconQualityRe
 }
 
 export function generateIconVariants(input:Omit<IconGenerationInput,"style">&{styles?:Exclude<IconStyle,"auto">[]}):Array<{style:Exclude<IconStyle,"auto">;svgMarkup:string;prompt:string;colors:{backgroundColor?:string;foregroundColor?:string;accentColor?:string}}> {
-  const styles=input.styles?.length?input.styles:["minimal","geometric","rounded","outline"];
+  const styles:Exclude<IconStyle,"auto">[]=input.styles?.length?input.styles:["minimal","geometric","rounded","outline"];
   if(styles.length>6||new Set(styles).size!==styles.length)throw new Error("Choose 1 to 6 unique icon styles.");
-  return styles.map((style)=>{const icon=generateIconFromPrompt({...input,style});return {style,svgMarkup:icon.svgMarkup,prompt:icon.prompt,colors:{backgroundColor:icon.colors.background,foregroundColor:icon.colors.foreground,accentColor:icon.colors.accent}};});
+  return styles.map((style:Exclude<IconStyle,"auto">)=>{const icon=generateIconFromPrompt({...input,style});return {style,svgMarkup:icon.svgMarkup,prompt:icon.prompt,colors:{backgroundColor:icon.colors.background,foregroundColor:icon.colors.foreground,accentColor:icon.colors.accent}};});
 }
 
 export function optimizeSvg(svgMarkup:string):{svgMarkup:string;originalBytes:number;optimizedBytes:number;savedBytes:number} {
@@ -202,7 +202,7 @@ function androidTransform(value:string):{open:string;close:string}{
 }
 export function svgToAndroidVectorDrawable(svgMarkup:string,options:{monochrome?:boolean;stripBackground?:boolean}={}):{xml:string;backgroundColor:string;viewportWidth:number;viewportHeight:number}{
   const root=parseSvg(svgMarkup).root,viewBox=(root.getAttribute("viewBox")||"0 0 512 512").trim().split(/[\s,]+/).map(Number);
-  if(viewBox.length!==4||viewBox.some((n)=>!Number.isFinite(n))||viewBox[2]<=0||viewBox[3]<=0)throw new Error("A valid SVG viewBox is required for Android vector export.");
+  if(viewBox.length!==4||viewBox.some((n:number)=>!Number.isFinite(n))||viewBox[2]<=0||viewBox[3]<=0)throw new Error("A valid SVG viewBox is required for Android vector export.");
   const vx=viewBox[0],vy=viewBox[1],vw=viewBox[2],vh=viewBox[3];
   if(Math.abs(vx)>0.001||Math.abs(vy)>0.001)throw new Error("Android VectorDrawable export currently requires a viewBox origin of 0,0.");
   const backgroundRect=(Array.from(root.childNodes as any).find((node:any)=>node.nodeType===1&&(node.localName||node.nodeName)==="rect"&&Math.abs(parseNumber(node,"x"))<0.001&&Math.abs(parseNumber(node,"y"))<0.001&&Math.abs(parseNumber(node,"width")-vw)<0.01&&Math.abs(parseNumber(node,"height")-vh)<0.01) as XmlElement|undefined);
