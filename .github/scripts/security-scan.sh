@@ -59,9 +59,21 @@ chmod 0755 "$BIN_DIR/osv-scanner"
 test -s "$BIN_DIR/osv-scanner"
 
 echo
- echo "=== Dependency path for minimatch ==="
- npm explain minimatch || true
- npm ls minimatch --all || true
+ echo "=== Lockfile dependency path for minimatch ==="
+ node <<'NODE'
+const fs = require('node:fs')
+const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'))
+const packages = lock.packages || {}
+for (const [path, pkg] of Object.entries(packages)) {
+  if (path.endsWith('/node_modules/minimatch') || path === 'node_modules/minimatch') {
+    console.log(`MINIMATCH ${pkg.version} at ${path}`)
+  }
+}
+for (const [path, pkg] of Object.entries(packages)) {
+  const declared = pkg.dependencies?.minimatch || pkg.optionalDependencies?.minimatch || pkg.peerDependencies?.minimatch
+  if (declared) console.log(`PARENT ${path || '<root>'} declares minimatch ${declared}`)
+}
+NODE
  echo
 
 echo "Installing Semgrep Community CLI v${SEMGREP_VERSION} in an isolated Python venv."
