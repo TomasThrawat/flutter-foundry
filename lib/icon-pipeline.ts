@@ -184,9 +184,12 @@ function shapeToPath(element:XmlElement):string{
 function androidColor(value:string|null):string{
   if(!value||value==="none"||value==="transparent")return "#00000000";
   const color=COLOR_NAMES[value.toLowerCase()]||value;
-  if(/^#[0-9a-f]{3}$/i.test(color))return "#FF"+color[1]+color[1]+color[2]+color[2]+color[3]+color[3];
-  if(/^#[0-9a-f]{6}$/i.test(color))return "#FF"+color.slice(1);
-  if(/^#[0-9a-f]{8}$/i.test(color))return "#"+color.slice(7)+color.slice(1,7);
+  if(/^#[0-9a-f]{3}$/i.test(color)){
+    const normalized=color.toUpperCase();
+    return "#FF"+normalized[1]+normalized[1]+normalized[2]+normalized[2]+normalized[3]+normalized[3];
+  }
+  if(/^#[0-9a-f]{6}$/i.test(color))return "#FF"+color.slice(1).toUpperCase();
+  if(/^#[0-9a-f]{8}$/i.test(color))return "#"+color.slice(7).toUpperCase()+color.slice(1,7).toUpperCase();
   if(color==="#00000000")return color;
   throw new Error("Android VectorDrawable cannot convert color: "+value+".");
 }

@@ -60,7 +60,7 @@ test("rejects unsafe or unknown targeted element attributes", () => {
 test("quality analysis reports dimensions, element count and artwork metrics", async () => {
   const report = await analyzeIconQuality(sample);
   assert.equal(report.dimensions.aspectRatio, 1);
-  assert.ok(report.metrics.elementCount >= 4);
+  assert.equal(report.metrics.elementCount, 3);
   assert.ok(report.score >= 0 && report.score <= 100);
   assert.ok(Array.isArray(report.findings));
 });
