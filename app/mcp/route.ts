@@ -5,6 +5,7 @@ import { getPubPackage, queryOsvPackages, searchPubPackages } from "@/lib/resour
 import { runSvgEdit } from "@/lib/svg-edit";
 import { generateIconFromPrompt } from "@/lib/icon-generator";
 import { renderIconPng, validateCustomIconSvg } from "@/lib/icon-png";
+import { analyzeIconQuality, editSvgElements, exportIconBundle, generateIconVariants, optimizeSvg, prepareEditableSvg, vectorizeRasterImage } from "@/lib/icon-pipeline";
 import { registerAuditTools } from "@/lib/audit-engines";
 import { registerGithubAuditTools } from "@/lib/github-audit-runner";
 import { registerSuperpowersTools } from "@/lib/superpowers";
@@ -244,6 +245,89 @@ const handler = createMcpHandler((server) => {
     integration: "Playwright + Chromium; open editor, call loadSvgString, serialize canvas, capture screenshot.",
     license: "Verify upstream and dependency licenses before redistribution."
   }));
+
+  register("icon_generate_variants", "Generate comparable icon style variants",
+    "Generate multiple deterministic SVG style variants from the same prompt and return PNG previews for comparison. This is procedural vector generation, not paid AI inference.",
+    z.object({
+      prompt: z.string().min(3).max(500),
+      size: z.number().int().min(128).max(1024).optional(),
+      backgroundColor: z.string().max(32).optional(),
+      foregroundColor: z.string().max(32).optional(),
+      accentColor: z.string().max(32).optional(),
+      styles: z.array(z.enum(["minimal", "geometric", "rounded", "outline", "pixel", "abstract"])).min(1).max(6).optional()
+    }).strict(),
+    async (input: any) => {
+      const variants = generateIconVariants(input);
+      return {
+        variants: await Promise.all(variants.map(async (variant) => {
+          const rendered = await renderIconPng(variant.svgMarkup, input.size || 512);
+          const quality = await analyzeIconQuality(variant.svgMarkup);
+          return { ...variant, pngBase64: rendered.pngBase64, pngMimeType: "image/png", width: rendered.width, height: rendered.height, quality };
+        }))
+      };
+    });
+
+  register("icon_prepare_editable_svg", "Prepare SVG with stable editable element IDs",
+    "Validate an SVG and assign stable IDs to supported graphic elements so later edits can target one shape without replacing the rest of the document.",
+    z.object({ svgMarkup: z.string().min(20).max(250000) }).strict(),
+    ({ svgMarkup }: { svgMarkup: string }) => prepareEditableSvg(svgMarkup));
+
+  register("icon_edit_elements", "Edit specific SVG elements without replacing the design",
+    "Apply safe set-attribute, remove-attribute or remove-element operations to selected SVG element IDs. Unselected elements are preserved.",
+    z.object({
+      svgMarkup: z.string().min(20).max(250000),
+      operations: z.array(z.object({
+        id: z.string().min(1).max(128),
+        action: z.enum(["set-attributes", "remove-attributes", "remove-element"]),
+        attributes: z.record(z.string(), z.string()).optional(),
+        removeAttributes: z.array(z.string()).min(1).max(12).optional()
+      }).strict()).min(1).max(20)
+    }).strict(),
+    async (input: any) => {
+      const operations = input.operations.map((item: any) => item.action === "remove-attributes"
+        ? { id: item.id, action: item.action, attributes: item.removeAttributes || [] }
+        : item);
+      const edited = editSvgElements(input.svgMarkup, operations);
+      const [png, quality] = await Promise.all([
+        renderIconPng(edited.svgMarkup, 512),
+        analyzeIconQuality(edited.svgMarkup)
+      ]);
+      return { ...edited, pngBase64: png.pngBase64, pngMimeType: "image/png", quality };
+    });
+
+  register("icon_analyze_quality", "Analyze SVG icon quality",
+    "Run heuristic checks for canvas shape, artwork scale, safe margins, centering, palette complexity and SVG element count. Findings are advisory, not a substitute for device review.",
+    z.object({ svgMarkup: z.string().min(20).max(250000) }).strict(),
+    async ({ svgMarkup }: { svgMarkup: string }) => {
+      const optimized = optimizeSvg(svgMarkup);
+      const quality = await analyzeIconQuality(optimized.svgMarkup);
+      return { ...optimized, quality };
+    });
+
+  register("icon_export_bundle", "Export Android and iOS icon bundle",
+    "Build a ZIP containing the source SVG, PNG size variants, Android adaptive icon resources, monochrome VectorDrawable, legacy density icons and an iOS AppIcon asset catalog. Unsupported vector features are rejected with an explicit explanation.",
+    z.object({
+      svgMarkup: z.string().min(20).max(250000),
+      appName: z.string().max(80).optional(),
+      packageName: z.string().max(160).optional(),
+      pngSizes: z.array(z.number().int().min(32).max(1024)).min(1).max(12).optional()
+    }).strict(),
+    async (input: any) => exportIconBundle(input.svgMarkup, input));
+
+  register("icon_vectorize_raster", "Convert a raster image into editable SVG",
+    "Convert a PNG, JPEG or WebP image into a limited-palette SVG using editable vector rectangles. Best for flat artwork and pixel-style images; detailed photos are posterized rather than faithfully traced.",
+    z.object({
+      imageBase64: z.string().min(32).max(7000000),
+      size: z.number().int().min(16).max(64).optional(),
+      colors: z.number().int().min(2).max(8).optional()
+    }).strict(),
+    async (input: any) => vectorizeRasterImage(input.imageBase64, input));
+
+  register("icon_optimize_svg", "Optimize and minify SVG markup",
+    "Validate an SVG and remove comments and redundant whitespace while preserving its vector geometry.",
+    z.object({ svgMarkup: z.string().min(20).max(250000) }).strict(),
+    ({ svgMarkup }: { svgMarkup: string }) => optimizeSvg(svgMarkup));
+
   registerAuditTools(register);
   registerGithubAuditTools(register);
   registerSuperpowersTools(register);

@@ -14,7 +14,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "test:svg-edit": "playwright test tests/svg-edit.integration.spec.ts"
+    "test:svg-edit": "playwright test tests/svg-edit.integration.spec.ts",
+    "test:icons": "tsx --test tests/icon-pipeline.test.ts tests/icon-generator.test.ts tests/icon-png.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",

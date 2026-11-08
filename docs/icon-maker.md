@@ -1,0 +1,45 @@
+# Icon Maker Pipeline
+
+Flutter Foundry exposes a unified icon workflow at /icon-maker and through the /mcp endpoint.
+
+## Capabilities
+
+- Prompt-driven deterministic SVG generation with minimal, geometric, rounded, outline, pixel and abstract styles. The procedural generator does not call a paid image API.
+- Multi-style variants from one prompt, with PNG previews for direct comparison.
+- SVG element preparation with stable IDs and targeted safe edits. Only selected elements are changed; supported operations are set attributes, remove attributes and remove element.
+- Automated heuristic quality report for viewBox shape, visible artwork bounds, margins, centering, element count and approximate rendered palette size. Scores and findings are advisory.
+- SVG validation and whitespace optimization.
+- Raster import for PNG, JPEG and WebP. The conversion uses a limited-color, low-resolution rectangle trace. It is intended for flat artwork and pixel-style graphics, not photo-faithful vector tracing.
+- ZIP export with source SVG, multiple PNG sizes, Android adaptive icon resources, monochrome and foreground VectorDrawable resources, legacy density PNGs and an iOS AppIcon asset catalog.
+- Local browser undo/redo and up to 30 saved versions using localStorage.
+
+## MCP tools
+
+- icon_generate_from_prompt
+- icon_generate_variants
+- icon_prepare_editable_svg
+- icon_edit_elements
+- icon_analyze_quality
+- icon_optimize_svg
+- icon_vectorize_raster
+- icon_export_bundle
+- icon_render_custom_svg
+- svgedit_process_svg
+
+The custom-SVG renderer accepts fully authored SVG and rasterizes it locally with Sharp. No external image-generation API is involved.
+
+## Android vector export limitations
+
+The Android VectorDrawable exporter supports SVG paths, rectangles, circles, ellipses, lines, polylines, polygons and simple translate/scale/rotate transforms. Unsupported features such as gradients, filters, masks, text, clipping paths and complex transforms produce an explicit error. The export does not silently rasterize those features into the vector resource. PNG outputs preserve the rendered SVG appearance and are included as alternatives.
+
+## Quality and preview limitations
+
+The quality score is based on heuristic raster measurements. The dominant rendered color is treated as the estimated canvas background when calculating artwork bounds; complex gradients and multicolor full-bleed artwork can make this approximation less useful. Always review the PNG at real launcher size and test Android adaptive masks or iOS assets in the target platform.
+
+## Validation
+
+    npm run typecheck
+    npm test
+    npm run lint
+    npm run build
+    npm run test:svg-edit

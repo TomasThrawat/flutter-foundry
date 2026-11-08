@@ -21,6 +21,7 @@ A fresh open-source Flutter engineering MCP server built around live official da
 
 - Unified code-security audit MCP: engine catalog/status, heuristic checks for supplied files, and optional allowlisted local CLI scans with sanitized output. See docs/audit-mcp.md for limitations.
 
+- Unified Icon Maker Pipeline: procedural SVG generation, comparable variants, element-targeted edits, heuristic quality checks, SVG optimization, raster-to-vector import, SVG-Edit integration, and Android/iOS ZIP exports. See docs/icon-maker.md.
 - SVG-Edit + Playwright: browser opens upstream SVG-Edit, imports provided SVG into the editor canvas, serializes the result, and captures a PNG screenshot.
 
 ## Run locally
@@ -40,6 +41,7 @@ Open http://localhost:3000, visit /icon-maker, or connect an MCP client to http:
 ```sh
 npm run typecheck
 npm test
+npm run test:icons
 npx playwright install --with-deps chromium
 npm run test:svg-edit
 npm run build
