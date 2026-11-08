@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # Free/open-source security gate for Flutter Foundry; no paid API keys are used.
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 case "$(uname -s):$(uname -m)" in
