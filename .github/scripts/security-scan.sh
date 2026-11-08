@@ -65,18 +65,33 @@ if (affected.length) {
 console.log('PASS: no advisory-affected minimatch versions in package-lock.json')
 NODE
 
-TRIVY_VERSION="0.76.1"
+TRIVY_VERSION="0.76.2"
 GITLEAKS_VERSION="8.30.1"
 OSV_SCANNER_VERSION="2.7.0"
 SEMGREP_VERSION="1.182.1"
 
-echo "Installing Trivy v${TRIVY_VERSION} and verifying the checksum published with its release."
-TRIVY_ASSET="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-download_release_asset "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${TRIVY_ASSET}" "$TMP_DIR/$TRIVY_ASSET"
-download_release_asset "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_checksums.txt" "$TMP_DIR/trivy-checksums.txt"
-(cd "$TMP_DIR" && grep -F "$TRIVY_ASSET" trivy-checksums.txt | sha256sum -c -)
-tar -xzf "$TMP_DIR/$TRIVY_ASSET" -C "$TMP_DIR" trivy
-install -m 0755 "$TMP_DIR/trivy" "$BIN_DIR/trivy"
+echo "Installing Trivy v${TRIVY_VERSION} from the official signed Debian repository."
+sudo apt-get install -y --no-install-recommends gnupg
+download_release_asset "https://aquasecurity.github.io/trivy-repo/deb/public.key" "$TMP_DIR/trivy-repo-public.key"
+sudo install -d -m 0755 /usr/share/keyrings
+sudo gpg --dearmor --batch --yes --output /usr/share/keyrings/trivy.gpg "$TMP_DIR/trivy-repo-public.key"
+echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list >/dev/null
+sudo apt-get update
+TRIVY_APT_VERSION="$(apt-cache policy trivy | awk '/Candidate:/ {print $2; exit}')"
+case "$TRIVY_APT_VERSION" in
+  "${TRIVY_VERSION}"|"${TRIVY_VERSION}"-*) ;;
+  *)
+    echo "ERROR: Official Trivy repository candidate is '${TRIVY_APT_VERSION}', expected ${TRIVY_VERSION}." >&2
+    exit 1
+    ;;
+esac
+sudo apt-get install -y --no-install-recommends "trivy=${TRIVY_APT_VERSION}"
+TRIVY_INSTALLED_VERSION="$(trivy --version | awk '/Version:/ {print $2; exit}')"
+if [[ "$TRIVY_INSTALLED_VERSION" != "$TRIVY_VERSION" ]]; then
+  echo "ERROR: Installed Trivy version '${TRIVY_INSTALLED_VERSION}' does not match required ${TRIVY_VERSION}." >&2
+  exit 1
+fi
+install -m 0755 "$(command -v trivy)" "$BIN_DIR/trivy"
 
 echo "Installing Gitleaks v${GITLEAKS_VERSION} and verifying its official checksum."
 GITLEAKS_ASSET="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
