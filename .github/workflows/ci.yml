@@ -51,6 +51,19 @@ jobs:
           node-version: 24
       - name: Install dependencies (known npm peer-resolution quirk)
         run: npm ci --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
+      - name: Format remaining XML pipeline import (one-time)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          npx --yes --package=@biomejs/biome biome format --write lib/icon-pipeline.ts
+          tar -czf "$RUNNER_TEMP/biome-xml-pipeline.tar.gz" lib/icon-pipeline.ts
+      - name: Upload XML pipeline formatting (one-time)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: biome-xml-pipeline
+          path: ${{ runner.temp }}/biome-xml-pipeline.tar.gz
+          if-no-files-found: error
+          retention-days: 1
       - name: Audit dependencies
         run: npm audit --audit-level=moderate
       - run: npm run typecheck
