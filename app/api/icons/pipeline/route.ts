@@ -10,7 +10,11 @@ import {
 	vectorizeRasterImage,
 } from "@/lib/icon-pipeline";
 import { renderIconPng } from "@/lib/icon-png";
-import { bestEffortRateLimit, readJsonBodyLimited, RequestBodyTooLargeError } from "@/lib/request-guards";
+import {
+	bestEffortRateLimit,
+	RequestBodyTooLargeError,
+	readJsonBodyLimited,
+} from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -23,7 +27,10 @@ export async function POST(request: Request) {
 	const limited = bestEffortRateLimit(request, "icon-pipeline", 30, 60_000);
 	if (limited) return limited;
 	try {
-		const body = await readJsonBodyLimited<Record<string, unknown>>(request, 9 * 1024 * 1024);
+		const body = await readJsonBodyLimited<Record<string, unknown>>(
+			request,
+			9 * 1024 * 1024,
+		);
 		const operation = body.operation;
 		if (typeof operation !== "string") return fail("Provide an operation.");
 		if (operation === "generate") {
