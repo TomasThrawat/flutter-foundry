@@ -243,11 +243,11 @@ test("main and standalone MCP endpoints are intentionally no-auth", async () => 
 		);
 		assert.match(
 			route,
-			/export async function GET\(request: Request\)\s*\{\s*return handler\(request\);\s*\}/,
+			/export async function GET\(request: Request\)\s*\{\s*const limited = await enforceRateLimit\(request,[\s\S]*?if \(limited\) return limited;\s*return handler\(request\);\s*\}/,
 		);
 		assert.match(
 			route,
-			/export async function POST\(request: Request\)\s*\{\s*return handler\(request\);\s*\}/,
+			/export async function POST\(request: Request\)\s*\{\s*const limited = await enforceRateLimit\(request,[\s\S]*?if \(limited\) return limited;\s*return handler\(request\);\s*\}/,
 		);
 	}
 });

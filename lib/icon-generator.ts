@@ -190,7 +190,7 @@ function conceptOf(p: string): string {
 		["lock", /(?:\block\b|padlock|locked|قفل|قفل أمان)/i],
 		[
 			"shield",
-			/(?:shield|security|secure|protection|lock|privacy|درع|حماية|قفل)/i,
+			/(?:shield|security|secure|protection|privacy|درع|حماية)/i,
 		],
 		[
 			"location",
