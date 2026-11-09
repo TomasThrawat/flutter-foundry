@@ -12,9 +12,9 @@ A fresh open-source Flutter engineering MCP server built around live official da
 
 - Live pub.dev search and package metadata.
 - Official Flutter/Dart references and stack recommendations.
-- GitHub Actions workflow generation.
+- GitHub Actions workflow generation, including on-demand Flutter project analysis, tests, coverage, and release APK builds; version-tagged source releases with SHA-256 checksums.
 - Flutter/Dart/Gradle build-log triage with first-cause hints and repair planning.
-- Optional real Flutter analyzer through a fixed local CLI adapter inside AUDIT_ALLOWED_ROOTS; it requires a locally installed Flutter SDK and is not bundled in Vercel.
+- Real Flutter analysis and release APK builds through an on-demand GitHub Actions workflow for active public repositories; the local CLI analyzer remains available when Flutter is installed on the MCP host.
 - ARB localization key/placeholder checks and LCOV coverage summaries.
 - Heuristic Android manifest/Gradle and Flutter accessibility checks, including exported-component permission review and ARB locale direction/mismatch reporting.
 - OSV scans for exact dependency versions.
@@ -43,6 +43,8 @@ Open http://localhost:3000, visit /icon-maker, or connect an MCP client to http:
 npm run typecheck
 npm test
 npm run test:icons
+npm run test:icons:coverage
+npm run test:coverage
 npx playwright install --with-deps chromium
 npm run test:svg-edit
 npm run build
@@ -59,7 +61,7 @@ The SVG-Edit integration test contacts the official hosted editor and requires o
 3. Set ICON_API_TOKEN to protect the browser-heavy /api/icons/edit endpoint.
 4. Keep SVG_EDIT_URL at its official default unless you intentionally configure a trusted compatible build.
 
-The Playwright call can take tens of seconds because it starts Chromium and loads a remote editor. Verify serverless duration and memory limits on the selected plan. Public icon endpoints enforce request-body caps and a best-effort in-memory per-instance throttle; this is not a global rate limiter. Configure provider-level limits for production traffic.
+The Playwright call can take tens of seconds because it starts Chromium and loads a remote editor. Verify serverless duration and memory limits on the selected plan. Public icon and MCP endpoints enforce request throttling. Set both UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN to enable cross-instance global limits; otherwise a bounded per-instance fallback is used. Configure provider-level protections as an additional production layer.
 
 ## Security notes
 
@@ -76,4 +78,8 @@ Static findings are advisory. The tools do not claim a Flutter build or device t
 
 ### Flutter analysis
 
-When a local machine or MCP host has the Flutter SDK installed, flutter-analyze runs the fixed, read-only command flutter analyze --no-pub. The target must be within AUDIT_ALLOWED_ROOTS and contain pubspec.yaml. The hosted Vercel deployment does not include the Flutter SDK; there the engine reports not_installed and build-log triage remains available.
+When a local machine or MCP host has the Flutter SDK installed, flutter-analyze runs the fixed, read-only command flutter analyze --no-pub. The target must be within AUDIT_ALLOWED_ROOTS and contain pubspec.yaml. The hosted Vercel deployment does not include the Flutter SDK; there the local engine reports not_installed. Use the flutter_run_github_project_ci MCP tool (requires GITHUB_AUDIT_TOKEN) or manually dispatch .github/workflows/flutter-project-ci.yml to run analysis, tests, coverage, and an APK build for an active public repository. See docs/flutter-project-ci.md.
+
+## Releases
+
+Push a version tag such as v1.0.1 to trigger .github/workflows/release.yml. The workflow runs dependency audit, typecheck, tests, full library coverage, lint, and the production build, then publishes a source archive with a SHA-256 checksum. Flutter Foundry is a Next.js MCP service, so this release workflow does not create an APK.

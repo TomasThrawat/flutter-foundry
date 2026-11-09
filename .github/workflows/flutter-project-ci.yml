@@ -1,0 +1,133 @@
+name: Flutter Project CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repository:
+        description: Active public GitHub Flutter project (owner/repository)
+        required: true
+        type: string
+      target_ref:
+        description: Branch, tag, or commit to build
+        required: true
+        type: string
+        default: main
+      flutter_channel:
+        description: Flutter SDK channel
+        required: true
+        type: choice
+        options:
+          - stable
+          - beta
+          - main
+        default: stable
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-project-ci-${{ inputs.target_repository }}-${{ inputs.target_ref }}
+  cancel-in-progress: false
+
+jobs:
+  analyze-test-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      TARGET_REPOSITORY: ${{ inputs.target_repository }}
+      TARGET_REF: ${{ inputs.target_ref }}
+      FLUTTER_CHANNEL: ${{ inputs.flutter_channel }}
+    steps:
+      - name: Validate target repository and ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$TARGET_REPOSITORY" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$ ]] || [[ "$TARGET_REPOSITORY" == *".."* ]]; then
+            echo "Invalid repository. Expected owner/repository."
+            exit 1
+          fi
+          if [[ ! "$TARGET_REF" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$ ]] || [[ "$TARGET_REF" == *".."* ]] || [[ "$TARGET_REF" == *"//"* ]] || [[ "$TARGET_REF" == */ ]] || [[ "$TARGET_REF" == *"." ]] || [[ "$TARGET_REF" == *".lock" ]]; then
+            echo "Invalid target ref."
+            exit 1
+          fi
+          case "$FLUTTER_CHANNEL" in stable|beta|main) ;; *) echo "Invalid Flutter channel."; exit 1 ;; esac
+          metadata="$(curl --fail --silent --show-error "https://api.github.com/repos/$TARGET_REPOSITORY")"
+          visibility="$(jq -r '.visibility // empty' <<< "$metadata")"
+          archived="$(jq -r '.archived // true' <<< "$metadata")"
+          if [[ "$visibility" != "public" || "$archived" != "false" ]]; then
+            echo "Only active public repositories can be built."
+            exit 1
+          fi
+          echo "Validated public target: $TARGET_REPOSITORY@$TARGET_REF"
+
+      - name: Check out target source without persisted credentials
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          repository: ${{ env.TARGET_REPOSITORY }}
+          ref: ${{ env.TARGET_REF }}
+          path: target
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@4cab68ce0f1c7c924f688bff4792e044f1aeb30c # verified upstream commit
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+          pub-cache: true
+
+      - name: Record Flutter environment
+        continue-on-error: true
+        run: |
+          flutter --version
+          flutter doctor -v
+
+      - name: Resolve Dart dependencies
+        working-directory: target
+        run: flutter pub get
+
+      - name: Analyze Flutter project
+        working-directory: target
+        run: flutter analyze --no-pub
+
+      - name: Run tests and collect LCOV coverage
+        working-directory: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -d test ]] && find test -type f -name '*_test.dart' -print -quit | grep -q .; then
+            flutter test --no-pub --coverage
+          else
+            echo "No Dart test files found; Flutter tests were skipped." | tee "$RUNNER_TEMP/flutter-tests-skipped.txt"
+          fi
+
+      - name: Build release APK
+        working-directory: target
+        run: flutter build apk --release --no-pub
+
+      - name: Upload APK, lockfile, and coverage
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flutter-ci-${{ github.run_id }}
+          path: |
+            target/build/app/outputs/flutter-apk/app-release.apk
+            target/coverage/lcov.info
+            target/pubspec.lock
+            ${{ runner.temp }}/flutter-tests-skipped.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "# Flutter Project CI"
+            echo
+            echo "- Target: $TARGET_REPOSITORY@$TARGET_REF"
+            echo "- Flutter channel: $FLUTTER_CHANNEL"
+            echo "- Target checkout does not persist Git credentials."
+            echo "- Flutter analysis, tests, and APK build failures fail this workflow."
+            echo "- Download the flutter-ci-${{ github.run_id }} artifact for the APK and LCOV report when available."
+          } >> "$GITHUB_STEP_SUMMARY"

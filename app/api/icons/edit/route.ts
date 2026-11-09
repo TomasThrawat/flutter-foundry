@@ -1,5 +1,5 @@
 import {
-	bestEffortRateLimit,
+	enforceRateLimit,
 	RequestBodyTooLargeError,
 	readJsonBodyLimited,
 } from "@/lib/request-guards";
@@ -7,7 +7,7 @@ import { runSvgEdit } from "@/lib/svg-edit";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 export async function POST(request: Request) {
-	const limited = bestEffortRateLimit(request, "svg-edit", 8, 60_000);
+	const limited = await enforceRateLimit(request, "svg-edit", 8, 60_000);
 	if (limited) return limited;
 	const token = process.env.ICON_API_TOKEN;
 	if (token && request.headers.get("authorization") !== `Bearer ${token}`)

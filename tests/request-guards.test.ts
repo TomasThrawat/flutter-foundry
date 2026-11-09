@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
 	bestEffortRateLimit,
+	enforceRateLimit,
 	RequestBodyTooLargeError,
 	readJsonBodyLimited,
 } from "../lib/request-guards";
@@ -59,4 +60,101 @@ test("does not apply a shared anonymous bucket when no proxy address is availabl
 		bestEffortRateLimit(request, "unknown-address", 1, 60_000),
 		null,
 	);
+});
+
+
+test("uses the optional Upstash global limiter and returns 429 above the shared limit", async () => {
+	const oldUrl = process.env.UPSTASH_REDIS_REST_URL;
+	const oldToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+	const originalFetch = globalThis.fetch;
+	process.env.UPSTASH_REDIS_REST_URL = "https://example.upstash.io";
+	process.env.UPSTASH_REDIS_REST_TOKEN = "test-token";
+	globalThis.fetch = (async () =>
+		new Response(JSON.stringify({ result: [3, 42] }), { status: 200 })) as typeof fetch;
+	try {
+		const limited = await enforceRateLimit(
+			new Request("https://example.test/mcp", {
+				headers: { "x-real-ip": "198.51.100.42" },
+			}),
+			"mcp",
+			2,
+			60_000,
+		);
+		assert.equal(limited?.status, 429);
+		assert.equal(limited?.headers.get("retry-after"), "42");
+	} finally {
+		globalThis.fetch = originalFetch;
+		if (oldUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL;
+		else process.env.UPSTASH_REDIS_REST_URL = oldUrl;
+		if (oldToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN;
+		else process.env.UPSTASH_REDIS_REST_TOKEN = oldToken;
+	}
+});
+
+test("fails closed when only one Upstash credential is configured", async () => {
+	const oldUrl = process.env.UPSTASH_REDIS_REST_URL;
+	const oldToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+	delete process.env.UPSTASH_REDIS_REST_URL;
+	process.env.UPSTASH_REDIS_REST_TOKEN = "test-token";
+	try {
+		const limited = await enforceRateLimit(
+			new Request("https://example.test/mcp", {
+				headers: { "x-real-ip": "198.51.100.43" },
+			}),
+			"mcp",
+			10,
+			60_000,
+		);
+		assert.equal(limited?.status, 503);
+	} finally {
+		if (oldUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL;
+		else process.env.UPSTASH_REDIS_REST_URL = oldUrl;
+		if (oldToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN;
+		else process.env.UPSTASH_REDIS_REST_TOKEN = oldToken;
+	}
+});
+
+test("rejects non-Upstash or non-HTTPS Redis endpoints", async () => {
+	const oldUrl = process.env.UPSTASH_REDIS_REST_URL;
+	const oldToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+	process.env.UPSTASH_REDIS_REST_URL = "http://127.0.0.1:8080";
+	process.env.UPSTASH_REDIS_REST_TOKEN = "test-token";
+	try {
+		const limited = await enforceRateLimit(
+			new Request("https://example.test/mcp", {
+				headers: { "x-real-ip": "198.51.100.44" },
+			}),
+			"mcp",
+			10,
+			60_000,
+		);
+		assert.equal(limited?.status, 503);
+	} finally {
+		if (oldUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL;
+		else process.env.UPSTASH_REDIS_REST_URL = oldUrl;
+		if (oldToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN;
+		else process.env.UPSTASH_REDIS_REST_TOKEN = oldToken;
+	}
+});
+
+
+test("fails closed when the global limiter cannot identify a client IP", async () => {
+	const oldUrl = process.env.UPSTASH_REDIS_REST_URL;
+	const oldToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+	process.env.UPSTASH_REDIS_REST_URL = "https://example.upstash.io";
+	process.env.UPSTASH_REDIS_REST_TOKEN = "test-token";
+	try {
+		const limited = await enforceRateLimit(
+			new Request("https://example.test/mcp"),
+			"mcp",
+			10,
+			60_000,
+		);
+		assert.equal(limited?.status, 503);
+	} finally {
+		if (oldUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL;
+		else process.env.UPSTASH_REDIS_REST_URL = oldUrl;
+		if (oldToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN;
+		else process.env.UPSTASH_REDIS_REST_TOKEN = oldToken;
+	}
 });

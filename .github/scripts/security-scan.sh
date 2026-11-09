@@ -138,17 +138,16 @@ exec docker run --rm --pull=never --platform linux/amd64 \
 EOF
 chmod 0755 "$BIN_DIR/osv-scanner"
 
-echo "Installing Semgrep Community CLI v${SEMGREP_VERSION} in an isolated Python venv."
-python3 -m venv "$TMP_DIR/semgrep-venv"
-"$TMP_DIR/semgrep-venv/bin/python" -m pip install --disable-pip-version-check "semgrep==${SEMGREP_VERSION}"
-SEMGREP="$TMP_DIR/semgrep-venv/bin/semgrep"
+echo "Installing Semgrep Community CLI v${SEMGREP_VERSION} from its version-pinned official container."
+SEMGREP_IMAGE="semgrep/semgrep:${SEMGREP_VERSION}"
+docker pull --platform linux/amd64 "$SEMGREP_IMAGE"
 
 echo
 echo "=== Scanner versions ==="
 "$BIN_DIR/trivy" --version
 "$BIN_DIR/gitleaks" version
 "$BIN_DIR/osv-scanner" --version
-"$SEMGREP" --version
+docker run --rm --pull=never --platform linux/amd64 "$SEMGREP_IMAGE" semgrep --version
 
 FAILED=0
 run_check() {
@@ -169,11 +168,20 @@ run_check "Trivy: HIGH/CRITICAL dependency vulnerabilities and misconfigurations
  --skip-dirs node_modules --skip-dirs .next \
  --scanners vuln,misconfig --severity HIGH,CRITICAL --exit-code 1 --no-progress .
 
+# MEDIUM findings are retained as advisory results and do not block the gate.
+run_check "Trivy: MEDIUM severity advisory report (non-blocking)" \
+ "$BIN_DIR/trivy" fs --cache-dir "$CACHE_DIR/trivy" \
+ --skip-dirs node_modules --skip-dirs .next \
+ --scanners vuln,misconfig --severity MEDIUM --exit-code 0 --no-progress .
+
 run_check "Gitleaks: committed secrets (redacted output)" \
  "$BIN_DIR/gitleaks" git --redact --exit-code 1 --no-banner .
 
 run_check "Semgrep Community: security-audit ERROR findings" \
- "$SEMGREP" scan --config p/security-audit --severity ERROR --error --metrics=off \
+ docker run --rm --pull=never --platform linux/amd64 \
+ --user "$(id -u):$(id -g)" -e HOME=/tmp \
+ -v "$ROOT_DIR:/src:ro" -w /src \
+ "$SEMGREP_IMAGE" semgrep scan --config p/security-audit --severity ERROR --error --metrics=off \
  --exclude node_modules --exclude .next .
 
 run_check "OSV-Scanner: dependency vulnerabilities" \

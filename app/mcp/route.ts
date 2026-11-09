@@ -9,6 +9,8 @@ import {
 } from "@/lib/analysis";
 import { registerAuditTools } from "@/lib/audit-engines";
 import { registerGithubAuditTools } from "@/lib/github-audit-runner";
+import { registerGithubFlutterCiTools } from "@/lib/github-flutter-ci-runner";
+import { enforceRateLimit } from "@/lib/request-guards";
 import { generateIconFromPrompt } from "@/lib/icon-generator";
 import {
 	analyzeIconQuality,
@@ -1067,12 +1069,17 @@ const handler = createMcpHandler((server) => {
 
 	registerAuditTools(register);
 	registerGithubAuditTools(register);
+	registerGithubFlutterCiTools(register);
 	registerSuperpowersTools(register);
 });
 
 export async function GET(request: Request) {
+	const limited = await enforceRateLimit(request, "mcp", 180, 60_000);
+	if (limited) return limited;
 	return handler(request);
 }
 export async function POST(request: Request) {
+	const limited = await enforceRateLimit(request, "mcp", 180, 60_000);
+	if (limited) return limited;
 	return handler(request);
 }

@@ -1,6 +1,6 @@
 # Audit Engine Scans
 
-The workflow at `.github/workflows/audit-engines.yml` runs the repository audit scanners on pushes to `main` and supports manual runs with `workflow_dispatch`.
+The workflow at .github/workflows/audit-engines.yml runs security scanners on pull requests targeting main and supports manual runs with workflow_dispatch. A scanner execution error or non-zero scanner result now fails the workflow after its diagnostic artifact is uploaded. Trivy HIGH/CRITICAL findings block; MEDIUM findings are reported as non-blocking advisories.
 
 ## Run manually
 
@@ -25,3 +25,11 @@ flutter-analyze is a fixed, read-only CLI adapter. It runs flutter analyze --no-
 - The selected project root contains pubspec.yaml.
 
 It does not invoke pub get, run tests or builds, or accept arbitrary CLI arguments. Vercel does not bundle the Flutter SDK; its engine status is therefore not_installed unless a separate host explicitly provides Flutter.
+
+## Version-pinned scanner execution
+
+The repository security gate pins Trivy and Semgrep versions and uses digest-pinned Gitleaks and OSV-Scanner images. The external audit runner uses explicit versions for Trivy and Semgrep, plus digest-pinned Gitleaks and OSV-Scanner images. Scanner findings and execution errors fail the workflow after reports are written; SKIPPED remains distinct from a clean scan.
+
+## Full project coverage
+
+The CI pipeline keeps the focused icon coverage report and adds npm run test:coverage to report coverage across the loaded lib/*.ts modules.

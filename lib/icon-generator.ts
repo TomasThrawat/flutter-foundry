@@ -169,20 +169,25 @@ function conceptOf(p: string): string {
 			"send",
 			/(?:\bsend\b|paper[\s-]?plane|outgoing|telegram|إرسال|ارسال|ارسل|طائرة ورقية)/i,
 		],
+		["upload", /(?:upload(?:ing)?|upload file|رفع ملف|رفع الملفات|رفع ملفات)/i],
+		["download", /(?:download(?:ing)?|save to device|تنزيل|تحميل)/i],
 		[
 			"trash",
 			/(?:\btrash\b|delete|garbage|recycle bin|trash can|سلة المهملات|سلة مهملات|سلة قمامة|حذف|مهملات)/i,
 		],
+		["headphones", /(?:headphones?|earbuds?|earphones?|headset|سماعات رأس|سماعات الرأس|سماعة رأس|سماعات أذن|سماعة أذن|هيدفونز?|إيربودز|ايربودز)/i],
 		[
 			"phone",
 			/(?:\bphone\b|telephone|handset|\bdial\b|\bcall\b|هاتف|اتصال|مكالمة|مكالمة هاتفية)/i,
 		],
 		["camera", /(?:camera|photo|photography|picture|كاميرا|تصوير|صورة)/i],
+		["keyboard", /(?:keyboard|keypad|typing keys|لوحة مفاتيح|لوحة المفاتيح|كيبورد)/i],
 		["calculator", /(?:calculator|math|arithmetic|آلة حاسبة|حاسبة)/i],
 		[
 			"weather",
 			/(?:weather|sunny|cloud|rain|storm|forecast|طقس|شمس|سحاب|مطر)/i,
 		],
+		["lock", /(?:\block\b|padlock|locked|قفل|قفل أمان)/i],
 		[
 			"shield",
 			/(?:shield|security|secure|protection|lock|privacy|درع|حماية|قفل)/i,
@@ -199,6 +204,7 @@ function conceptOf(p: string): string {
 		["heart", /(?:heart|health|medical|wellness|قلب|صحة|طبي)/i],
 		["leaf", /(?:leaf|plant|nature|eco|environment|ورقة شجر|نبات|طبيعة)/i],
 		["rocket", /(?:rocket|launch|space|startup|صاروخ|إطلاق|فضاء)/i],
+		["document", /(?:document|pdf|word document|file icon|paper file|مستند|وثيقة|ملف pdf)/i],
 		["book", /(?:book|reading|library|pages|كتاب|قراءة|مكتبة)/i],
 		["mail", /(?:email|e-mail|mail|envelope|inbox|بريد|إيميل)/i],
 		["search", /(?:search|find|magnifier|بحث|تكبير)/i],
@@ -209,7 +215,7 @@ function conceptOf(p: string): string {
 		["calendar", /(?:calendar|schedule|date|تقويم|جدول|تاريخ)/i],
 		["folder", /(?:folder|files|directory|ملفات|مجلد)/i],
 		["cart", /(?:shopping cart|cart|basket|store|shop|عربة تسوق|متجر|سلة)/i],
-		["music", /(?:music|audio|sound|headphones|note|موسيقى|صوت|سماعة|نغمة)/i],
+		["music", /(?:music|audio|sound|note|موسيقى|صوت|نغمة)/i],
 		["home", /(?:\bhome\b|house|building|منزل|بيت)/i],
 		["user", /(?:profile|user|account|person|avatar|حساب|شخص|ملف شخصي)/i],
 		[
@@ -461,7 +467,16 @@ export function generateIconFromPrompt(
 		line(207, 218, 207, 360, outline ? fg : negative, 13);
 		line(256, 218, 256, 360, outline ? fg : negative, 13);
 		line(305, 218, 305, 360, outline ? fg : negative, 13);
+	} else if (concept === "headphones") {
+		path("M104 278 V228 C104 143 171 78 256 78 C341 78 408 143 408 228 V278", "none", fg, 30);
+		rect(88, 230, 88, 154, main, style === "rounded" ? 28 : 10, edge, ew);
+		rect(336, 230, 88, 154, main, style === "rounded" ? 28 : 10, edge, ew);
+		if (!outline) {
+			path("M176 352 C184 390 215 408 256 408 H286", "none", accent, 12);
+			circle(300, 408, 10, accent);
+		}
 	} else if (concept === "phone") {
+		path(	} else if (concept === "phone") {
 		path(
 			"M145 83 C126 83 107 100 105 123 C98 198 155 294 220 354 C285 414 365 441 411 408 C431 394 439 369 425 350 L382 294 C370 278 350 274 333 284 L294 308 C268 294 225 254 205 224 L229 190 C239 175 237 157 225 144 L178 96 C169 87 157 83 145 83 Z",
 			main,
@@ -475,7 +490,18 @@ export function generateIconFromPrompt(
 				negative,
 				11,
 			);
+	} else if (concept === "download" || concept === "upload") {
+		if (concept === "download") {
+			line(256, 92, 256, 302, fg, 28);
+			path("M164 224 L256 316 L348 224", "none", accent, 28);
+			path("M112 356 V414 H400 V356", "none", fg, 24);
+		} else {
+			path("M112 356 V414 H400 V356", "none", fg, 24);
+			line(256, 420, 256, 210, fg, 28);
+			path("M164 290 L256 198 L348 290", "none", accent, 28);
+		}
 	} else if (concept === "camera") {
+		rect(98, 178, 316, 224, main, radius + 8, edge, ew);	} else if (concept === "camera") {
 		rect(98, 178, 316, 224, main, radius + 8, edge, ew);
 		rect(154, 132, 92, 56, main, radius, edge, ew);
 		circle(
@@ -539,7 +565,13 @@ export function generateIconFromPrompt(
 			edge,
 			ew,
 		);
+	} else if (concept === "lock") {
+		path("M164 226 V174 C164 118 204 82 256 82 C308 82 348 118 348 174 V226", "none", fg, 26);
+		rect(112, 214, 288, 226, main, style === "rounded" ? 30 : 12, edge, ew);
+		circle(256, 304, 25, outline ? "none" : accent, outline ? fg : "none", outline ? 11 : 0);
+		rect(246, 326, 20, 54, outline ? "none" : accent, 8, outline ? fg : "none", outline ? 8 : 0);
 	} else if (concept === "shield") {
+		path(	} else if (concept === "shield") {
 		path(
 			"M256 64 L402 122 L386 282 C370 352 322 411 256 450 C190 411 142 352 126 282 L110 122 Z",
 			main,
@@ -574,7 +606,14 @@ export function generateIconFromPrompt(
 		circle(178, 211, 17, outline ? fg : negative);
 		circle(256, 211, 17, outline ? fg : negative);
 		circle(334, 211, 17, outline ? fg : negative);
+	} else if (concept === "keyboard") {
+		rect(62, 150, 388, 232, main, style === "rounded" ? 28 : 12, edge, ew);
+		for (let r = 0; r < 3; r++)
+			for (let c = 0; c < 10; c++)
+				rect(88 + c * 35, 178 + r * 48, 23, 28, outline ? "none" : (r === 2 && c === 4 ? accent : negative), style === "rounded" ? 6 : 2, outline ? fg : "none", outline ? 5 : 0);
+		rect(176, 324, 160, 26, outline ? "none" : accent, 7, outline ? fg : "none", outline ? 5 : 0);
 	} else if (concept === "code") {
+		path("M202 154 L104 256 L202 358", "none", fg, 27);	} else if (concept === "code") {
 		path("M202 154 L104 256 L202 358", "none", fg, 27);
 		path("M310 154 L408 256 L310 358", "none", fg, 27);
 		path("M282 126 L230 386", "none", accent, 23);
@@ -631,7 +670,15 @@ export function generateIconFromPrompt(
 			outline ? fg : "none",
 			outline ? 12 : 0,
 		);
+	} else if (concept === "document") {
+		path("M126 72 H294 L386 164 V436 H126 Z", main, edge, ew);
+		path("M294 72 V164 H386", "none", outline ? fg : accent, 18);
+		line(174, 226, 334, 226, outline ? fg : negative, 12);
+		line(174, 274, 334, 274, outline ? fg : negative, 12);
+		line(174, 322, 310, 322, outline ? fg : negative, 12);
+		line(174, 370, 286, 370, outline ? fg : negative, 12);
 	} else if (concept === "book") {
+		path("M86 126 Q168 96 250 148 V388 Q168 336 86 366 Z", main, edge, ew);	} else if (concept === "book") {
 		path("M86 126 Q168 96 250 148 V388 Q168 336 86 366 Z", main, edge, ew);
 		path("M426 126 Q344 96 262 148 V388 Q344 336 426 366 Z", main, edge, ew);
 		line(256, 150, 256, 389, negative, 10);

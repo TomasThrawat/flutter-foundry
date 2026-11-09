@@ -1,0 +1,63 @@
+name: Flutter Foundry Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: flutter-foundry-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-and-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
+
+      - name: Typecheck, tests, coverage, lint, and production build
+        run: |
+          npm run typecheck
+          npm test
+          npm run test:coverage
+          npm run lint
+          npm run build
+
+      - name: Package source and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          git archive --format=tar.gz --prefix="flutter-foundry-$GITHUB_REF_NAME/" HEAD > "release/flutter-foundry-$GITHUB_REF_NAME-source.tar.gz"
+          cd release
+          sha256sum "flutter-foundry-$GITHUB_REF_NAME-source.tar.gz" > "flutter-foundry-$GITHUB_REF_NAME-source.tar.gz.sha256"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "release/flutter-foundry-$GITHUB_REF_NAME-source.tar.gz" \
+            "release/flutter-foundry-$GITHUB_REF_NAME-source.tar.gz.sha256" \
+            --verify-tag \
+            --generate-notes
