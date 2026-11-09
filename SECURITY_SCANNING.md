@@ -2,7 +2,7 @@
 
 Flutter Foundry's active CI workflow installs and runs four free/open-source scanners:
 
-- **Trivy 0.76.1** checks dependencies and repository configuration for HIGH/CRITICAL vulnerabilities and misconfigurations when supported files are present.
+- **Trivy 0.76.2** checks dependencies and repository configuration for HIGH/CRITICAL vulnerabilities and misconfigurations when supported files are present.
 - **Gitleaks 8.30.1** scans checked-out Git history for committed credentials with redacted findings.
 - **Semgrep Community CLI 1.182.1** runs the public `p/security-audit` rules and blocks on ERROR-severity findings.
 - **OSV-Scanner 2.7.0** checks supported dependency lockfiles and SBOMs against the public OSV vulnerability database.
@@ -11,13 +11,13 @@ Flutter Foundry's active CI workflow installs and runs four free/open-source sca
 
 The active GitHub Actions workflow is `.github/workflows/ci.yml`. The `security-scan` job downloads pinned scanner releases, verifies Trivy and Gitleaks with official release checksum files, then runs all four scanners. The existing `checks` and `svg-edit-browser` jobs depend on `security-scan`, so tests, the production build, and browser tests do not start until scans pass.
 
-This repository has no committed npm lockfile. The scanner job generates a lockfile in the GitHub Actions security-scan job's disposable checkout with `--package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps`, using its own writable npm cache, then scans the resolved dependency tree. The generated file is not committed and `package.json` is not changed by this step.
+This repository commits `package-lock.json` (lockfile version 3). It is generated with Node 24/npm 11 and the same `--legacy-peer-deps` resolver flag used during installation. The scanner reads this committed lockfile; it does not create or scan a temporary dependency resolution. `security-scan.sh` fails closed when the manifest or lockfile is missing, so OSV-Scanner cannot silently skip the JavaScript dependency graph.
 
-The checks and svg-edit-browser GitHub Actions jobs use `npm install --legacy-peer-deps` with a fresh per-job npm cache because plain `npm install` currently reports `@modelcontextprotocol/server@undefined` while resolving its peer dependency with `mcp-handler@2.3.0`. The published ranges `^2.4.0` and `^2.0.0` are otherwise compatible, and the scanner's isolated lockfile generation succeeds with the same flag. This is a compatibility workaround, not proof of application correctness: typechecking, dependency audit, tests, lint, production build, and Playwright still have to pass.
+The `checks` and `svg-edit-browser` GitHub Actions jobs use `npm ci --legacy-peer-deps` with a fresh per-job npm cache. The legacy peer flag is retained because plain npm peer resolution reports `@modelcontextprotocol/server@undefined` while resolving its peer dependency with `mcp-handler@2.3.0`. The same flag is used when generating the committed lockfile and when running `npm ci`, keeping the dependency tree reproducible. This compatibility workaround is not proof of application correctness: typechecking, dependency audit, tests, lint, production build, and Playwright still have to pass.
 
 Scanner CLIs install in a writable per-job temporary directory. No paid API credentials are used. Network access is needed for release downloads, public Semgrep rules, and vulnerability data. Scanner binaries are not installed in the deployed Vercel runtime.
 
-Run the scanner on Linux x86_64 with curl, tar, sha256sum, Python 3 with venv, Node/npm, and network access:
+Run the scanner on Linux x86_64 with curl, tar, sha256sum, Python 3 with venv, Node/npm, Docker, and network access:
 
 ```bash
 bash .github/scripts/security-scan.sh

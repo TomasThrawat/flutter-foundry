@@ -9,16 +9,14 @@ case "$(uname -s):$(uname -m)" in
  Linux:x86_64) ;;
  *) echo "Unsupported host: $(uname -s) $(uname -m); Linux x86_64 is required." >&2; exit 2 ;;
 esac
-for dep in curl tar sha256sum python3 npm docker; do command -v "$dep" >/dev/null; done
+for dep in curl tar sha256sum python3 node docker; do command -v "$dep" >/dev/null; done
 
-# Use per-job writable storage for all tools and npm cache. The runner's shared
-# ~/.npm cache has produced EACCES/EEXIST failures when resolving the manifest.
+# Use per-job writable storage for scanner binaries and their database cache.
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 BIN_DIR="$TMP_DIR/bin"
 CACHE_DIR="$TMP_DIR/cache"
-NPM_CACHE_DIR="$TMP_DIR/npm-cache"
-mkdir -p "$BIN_DIR" "$CACHE_DIR" "$NPM_CACHE_DIR"
+mkdir -p "$BIN_DIR" "$CACHE_DIR"
 
 download_release_asset() {
   local url="$1"
@@ -30,15 +28,13 @@ download_release_asset() {
 }
 
 export PATH="$BIN_DIR:$PATH"
-export npm_config_cache="$NPM_CACHE_DIR"
 
-# OSV-Scanner and Trivy need resolved JavaScript versions. Generate a temporary
-# lockfile only in this disposable CI checkout if the repository has no lockfile.
-# The legacy peer flag avoids the existing peer-resolution conflict; neither
-# package.json nor a generated lockfile is committed by this job.
-if [[ -f package.json && ! -f package-lock.json && ! -f npm-shrinkwrap.json && ! -f pnpm-lock.yaml && ! -f yarn.lock ]]; then
- echo "No npm lockfile found; generating a CI-only lockfile using a fresh, writable npm cache."
- npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps
+# OSV-Scanner and Trivy require resolved JavaScript dependency versions.
+# Fail closed when the repository lockfile is missing instead of scanning an
+# uncommitted dependency resolution that cannot be reproduced by contributors.
+if [[ ! -f package.json || ! -f package-lock.json ]]; then
+ echo "ERROR: package.json and a committed package-lock.json are required for dependency scanning." >&2
+ exit 2
 fi
 
 # Reject only minimatch releases covered by the current security advisory.

@@ -37,14 +37,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends ca-certificates curl tar gzip python3 python3-venv
       - name: Install and run Trivy, Gitleaks, Semgrep, and OSV-Scanner
         run: bash .github/scripts/security-scan.sh
-      - name: Upload generated lockfile for one-time repository bootstrap
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: package-lock-bootstrap
-          path: package-lock.json
-          if-no-files-found: error
-          retention-days: 1
 
   checks:
     needs: security-scan
@@ -58,7 +50,7 @@ jobs:
         with:
           node-version: 24
       - name: Install dependencies (known npm peer-resolution quirk)
-        run: npm install --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
+        run: npm ci --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
       - name: Audit dependencies
         run: npm audit --audit-level=moderate
       - run: npm run typecheck
@@ -82,6 +74,6 @@ jobs:
         with:
           node-version: 24
       - name: Install dependencies (known npm peer-resolution quirk)
-        run: npm install --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
+        run: npm ci --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
       - run: npx playwright install --with-deps chromium
       - run: npm run test:svg-edit
