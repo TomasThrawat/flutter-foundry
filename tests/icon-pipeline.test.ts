@@ -307,3 +307,13 @@ test("preserves partial alpha as SVG opacity and in the PNG preview", async () =
 	);
 	assert.equal(alphaAt(256, 256), 255, "opaque pixels must remain opaque");
 });
+
+
+test("rejects SVG gradients and filters rather than silently changing Android vector appearance", () => {
+	const gradient =
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g"><stop offset="0" stop-color="#fff"/></linearGradient></defs><rect width="512" height="512" fill="url(#g)"/></svg>';
+	const filtered =
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><filter id="blur"><feGaussianBlur stdDeviation="2"/></filter><circle cx="256" cy="256" r="100" filter="url(#blur)"/></svg>';
+	assert.throws(() => svgToAndroidVectorDrawable(gradient), /cannot convert/i);
+	assert.throws(() => svgToAndroidVectorDrawable(filtered), /cannot convert <filter>/i);
+});

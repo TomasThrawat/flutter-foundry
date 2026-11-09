@@ -19,6 +19,7 @@ test("catalog contains original engines and discovered add-ons", () => {
 		"super-linter",
 		"megalinter",
 		"detekt",
+		"flutter-analyze",
 		"ktlint",
 		"ruff",
 		"shellcheck",
@@ -44,6 +45,7 @@ test("catalog contains original engines and discovered add-ons", () => {
 test("runner allowlist excludes arbitrary AI and mutating graph workflows", () => {
 	const ids = getRunnableEngineIds();
 	assert.ok(ids.includes("trivy"));
+	assert.ok(ids.includes("flutter-analyze"));
 	assert.ok(ids.includes("gitleaks"));
 	assert.ok(ids.includes("prism-scanner"));
 	assert.ok(!ids.includes("pr-agent"));
