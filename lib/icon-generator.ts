@@ -165,9 +165,18 @@ function inferColor(
 function conceptOf(p: string): string {
 	const rules: Array<[string, RegExp]> = [
 		["qr-code", /(?:\bqr\b|qr[- ]?code|barcode|باركود|كيو\s*آر)/i],
-		["send", /(?:\bsend\b|paper[\s-]?plane|outgoing|telegram|إرسال|ارسال|ارسل|طائرة ورقية)/i],
-		["trash", /(?:\btrash\b|delete|garbage|recycle bin|trash can|سلة المهملات|سلة مهملات|سلة قمامة|حذف|مهملات)/i],
-		["phone", /(?:\bphone\b|telephone|handset|\bdial\b|\bcall\b|هاتف|اتصال|مكالمة|مكالمة هاتفية)/i],
+		[
+			"send",
+			/(?:\bsend\b|paper[\s-]?plane|outgoing|telegram|إرسال|ارسال|ارسل|طائرة ورقية)/i,
+		],
+		[
+			"trash",
+			/(?:\btrash\b|delete|garbage|recycle bin|trash can|سلة المهملات|سلة مهملات|سلة قمامة|حذف|مهملات)/i,
+		],
+		[
+			"phone",
+			/(?:\bphone\b|telephone|handset|\bdial\b|\bcall\b|هاتف|اتصال|مكالمة|مكالمة هاتفية)/i,
+		],
 		["camera", /(?:camera|photo|photography|picture|كاميرا|تصوير|صورة)/i],
 		["calculator", /(?:calculator|math|arithmetic|آلة حاسبة|حاسبة)/i],
 		[
@@ -459,7 +468,13 @@ export function generateIconFromPrompt(
 			edge,
 			ew,
 		);
-		if (!outline) path("M145 120 C133 123 128 135 130 151 C140 211 183 269 230 315", "none", negative, 11);
+		if (!outline)
+			path(
+				"M145 120 C133 123 128 135 130 151 C140 211 183 269 230 315",
+				"none",
+				negative,
+				11,
+			);
 	} else if (concept === "camera") {
 		rect(98, 178, 316, 224, main, radius + 8, edge, ew);
 		rect(154, 132, 92, 56, main, radius, edge, ew);
