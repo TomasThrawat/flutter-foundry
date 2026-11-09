@@ -10,7 +10,21 @@ export async function POST(request: Request) {
 	const limited = await enforceRateLimit(request, "svg-edit", 8, 60_000);
 	if (limited) return limited;
 	const token = process.env.ICON_API_TOKEN;
-	if (token && request.headers.get("authorization") !== `Bearer ${token}`)
+	const origin = request.headers.get("origin");
+	const fetchSite = request.headers.get("sec-fetch-site");
+	let isSameOrigin = false;
+	if (origin && fetchSite === "same-origin") {
+		try {
+			isSameOrigin = new URL(origin).origin === new URL(request.url).origin;
+		} catch {
+			isSameOrigin = false;
+		}
+	}
+	if (
+		token &&
+		!isSameOrigin &&
+		request.headers.get("authorization") !== `Bearer ${token}`
+	)
 		return Response.json(
 			{ error: "Unauthorized. Configure the ICON_API_TOKEN bearer token." },
 			{ status: 401 },

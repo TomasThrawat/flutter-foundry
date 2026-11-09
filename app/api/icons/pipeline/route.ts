@@ -173,8 +173,22 @@ export async function POST(request: Request) {
 				pngSizes: Array.isArray(body.pngSizes)
 					? (body.pngSizes as number[])
 					: undefined,
+				iosBackgroundColor:
+					typeof body.iosBackgroundColor === "string"
+						? body.iosBackgroundColor
+						: undefined,
 			});
-			return Response.json(bundle);
+			const archive = new Uint8Array(Buffer.from(bundle.zipBase64, "base64"));
+			return new Response(archive, {
+				headers: {
+					"content-type": "application/zip",
+					"content-disposition":
+						'attachment; filename="flutter-foundry-icon-pack.zip"',
+					"x-icon-file-count": String(bundle.fileCount),
+					"x-icon-bytes": String(bundle.bytes),
+					"cache-control": "no-store",
+				},
+			});
 		}
 		if (operation === "vectorize") {
 			if (typeof body.imageBase64 !== "string")
