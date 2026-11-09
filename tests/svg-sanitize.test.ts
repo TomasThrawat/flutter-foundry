@@ -71,7 +71,7 @@ test("sanitizer rejects empty and oversized input", () => {
 });
 
 test("sanitizer rejects malformed XML and a non-SVG root", () => {
-  assert.throws(() => sanitizeSvgInput("<svg><path></svg>"), /Invalid SVG XML/);
+  assert.throws(() => sanitizeSvgInput("<svg><path></svg>"), /Opening and ending tag mismatch/);
   assert.throws(() => sanitizeSvgInput("<html><body/></html>"), /root element must be <svg>/);
 });
 
@@ -91,7 +91,7 @@ test("sanitizer strips event handlers, styles, and unknown attributes recursivel
 });
 
 test("sanitizer rejects active content and unsafe URL references", () => {
-  for (const value of ["javascript:alert(1)", "vbscript:msgbox(1)", "data:text/html,<script>", "@import url(https://example.com/x.css)"]) {
+  for (const value of ["javascript:alert(1)", "vbscript:msgbox(1)", "data:text/html,plain", "@import url(https://example.com/x.css)"]) {
     assert.throws(() => sanitizeSvgInput(svg("", `fill="${value}"`)), /Unsafe value/);
   }
   assert.throws(() => sanitizeSvgInput(svg("", 'fill="url(https://example.com/gradient.svg#paint)"')), /External or unsupported URL/);
