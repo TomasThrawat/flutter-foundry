@@ -78,6 +78,26 @@ test("recognizes send, trash and phone icons in English and Arabic", () => {
 	}
 });
 
+test("renders complete camera, code, and book icon details", () => {
+	const camera = generateIconFromPrompt({ prompt: "camera icon" });
+	assert.match(
+		camera.svgMarkup,
+		/<rect x="154" y="132" width="92" height="56"/,
+	);
+	assert.match(camera.svgMarkup, /<circle cx="260" cy="286" r="63"/);
+
+	const code = generateIconFromPrompt({ prompt: "code icon" });
+	assert.match(code.svgMarkup, /<path d="M310 154 L408 256 L310 358"/);
+	assert.match(code.svgMarkup, /<path d="M282 126 L230 386"/);
+
+	const book = generateIconFromPrompt({ prompt: "book icon" });
+	assert.match(
+		book.svgMarkup,
+		/<path d="M426 126 Q344 96 262 148 V388 Q344 336 426 366 Z"/,
+	);
+	assert.match(book.svgMarkup, /<line x1="256" y1="150" x2="256" y2="389"/);
+});
+
 test("recognizes additional utility concepts in English and Arabic", () => {
 	const cases = [
 		{ prompt: "minimal wireless headphones icon", concept: "headphones" },
@@ -102,27 +122,4 @@ test("recognizes additional utility concepts in English and Arabic", () => {
 		assert.equal(generated.concept, item.concept, item.prompt);
 		assert.match(sanitizeSvgInput(generated.svgMarkup), /^<svg/);
 	}
-});
-
-test("renders complete camera, code and book concept geometry", () => {
-	const camera = generateIconFromPrompt({
-		prompt: "minimal camera icon",
-		style: "minimal",
-	});
-	const code = generateIconFromPrompt({
-		prompt: "code brackets with slash icon",
-		style: "minimal",
-	});
-	const book = generateIconFromPrompt({
-		prompt: "open book icon",
-		style: "minimal",
-	});
-	assert.equal(camera.concept, "camera");
-	assert.ok((camera.svgMarkup.match(/<rect /g) || []).length >= 2);
-	assert.ok((camera.svgMarkup.match(/<circle /g) || []).length >= 3);
-	assert.equal(code.concept, "code");
-	assert.ok((code.svgMarkup.match(/<path /g) || []).length >= 3);
-	assert.equal(book.concept, "book");
-	assert.ok((book.svgMarkup.match(/<path /g) || []).length >= 2);
-	assert.ok((book.svgMarkup.match(/<line /g) || []).length >= 4);
 });
