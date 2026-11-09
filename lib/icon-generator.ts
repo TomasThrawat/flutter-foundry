@@ -67,7 +67,7 @@ function color(
 	fallback: string,
 	transparent = false,
 ): string {
-	if (!value || !value.trim()) return fallback;
+	if (!value?.trim()) return fallback;
 	const v = value.trim().toLowerCase();
 	if (transparent && (v === "transparent" || v === "none"))
 		return "transparent";

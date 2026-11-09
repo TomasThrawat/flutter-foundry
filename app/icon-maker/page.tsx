@@ -513,14 +513,14 @@ export default function IconMakerPage() {
 						</label>
 					</div>
 					<div className="actions">
-						<button
+						<button type="button"
 							className="button primary"
 							disabled={busy || prompt.trim().length < 3}
 							onClick={generate}
 						>
 							{busy ? "Working…" : "Generate icon"}
 						</button>
-						<button className="button" disabled={busy} onClick={createVariants}>
+						<button type="button" className="button" disabled={busy} onClick={createVariants}>
 							Create 4 variants
 						</button>
 					</div>
@@ -602,7 +602,7 @@ export default function IconMakerPage() {
 						))}
 					</div>
 					<div className="actions">
-						<button
+						<button type="button"
 							className="button"
 							disabled={!png}
 							onClick={() =>
@@ -611,7 +611,7 @@ export default function IconMakerPage() {
 						>
 							Download PNG
 						</button>
-						<button
+						<button type="button"
 							className="button"
 							onClick={() =>
 								downloadText(
@@ -623,7 +623,7 @@ export default function IconMakerPage() {
 						>
 							Download SVG
 						</button>
-						<button className="button" disabled={busy} onClick={analyze}>
+						<button type="button" className="button" disabled={busy} onClick={analyze}>
 							Analyze current SVG
 						</button>
 					</div>
@@ -637,7 +637,7 @@ export default function IconMakerPage() {
 								}}
 							>
 								{variants.map((variant) => (
-									<button
+									<button type="button"
 										key={variant.style}
 										className="card"
 										onClick={() => selectVariant(variant)}
@@ -710,7 +710,7 @@ export default function IconMakerPage() {
 								onChange={(event) => setEditStroke(event.target.value)}
 							/>
 						</label>
-						<button
+						<button type="button"
 							className="button primary"
 							disabled={busy || !selectedElement}
 							onClick={editSelected}
@@ -723,30 +723,30 @@ export default function IconMakerPage() {
 						unsafe SVG attributes are rejected.
 					</p>
 					<div className="actions" style={{ marginTop: 14 }}>
-						<button
+						<button type="button"
 							className="button"
 							disabled={!canUndo || busy}
 							onClick={undo}
 						>
 							Undo
 						</button>
-						<button
+						<button type="button"
 							className="button"
 							disabled={!canRedo || busy}
 							onClick={redo}
 						>
 							Redo
 						</button>
-						<button className="button" disabled={busy} onClick={editInSvgEdit}>
+						<button type="button" className="button" disabled={busy} onClick={editInSvgEdit}>
 							Open in SVG-Edit
 						</button>
-						<button
+						<button type="button"
 							className="button"
 							onClick={() => saveVersion(svg, "Manual checkpoint")}
 						>
 							Save version
 						</button>
-						<button
+						<button type="button"
 							className="button"
 							onClick={() => {
 								setSvg(sample);
@@ -841,7 +841,7 @@ export default function IconMakerPage() {
 							onChange={(event) => setPackageName(event.target.value)}
 						/>
 					</label>
-					<button
+					<button type="button"
 						className="button primary"
 						disabled={busy || !svg.trim()}
 						onClick={exportBundle}
