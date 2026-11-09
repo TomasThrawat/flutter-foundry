@@ -1,9 +1,16 @@
 import { z } from "zod";
-import { isSafeGitHubRef, isSafeGitHubRepository } from "@/lib/github-audit-runner";
+import {
+	isSafeGitHubRef,
+	isSafeGitHubRepository,
+} from "@/lib/github-audit-runner";
 
 const CONTROL_REPOSITORY = "TomasThrawat/flutter-foundry";
 const WORKFLOW_FILE = "flutter-project-ci.yml";
-const WORKFLOW_URL = "https://github.com/" + CONTROL_REPOSITORY + "/actions/workflows/" + WORKFLOW_FILE;
+const WORKFLOW_URL =
+	"https://github.com/" +
+	CONTROL_REPOSITORY +
+	"/actions/workflows/" +
+	WORKFLOW_FILE;
 const API_ROOT = "https://api.github.com";
 const MAX_DISPATCHES_PER_HOUR = 6;
 
@@ -61,7 +68,9 @@ async function githubRequest(
 	if (body) {
 		try {
 			const parsed: unknown = JSON.parse(body);
-			data = isApiObject(parsed) ? parsed : { message: "GitHub returned a non-object JSON response." };
+			data = isApiObject(parsed)
+				? parsed
+				: { message: "GitHub returned a non-object JSON response." };
 		} catch {
 			data = { message: "GitHub returned a non-JSON response." };
 		}
@@ -70,10 +79,20 @@ async function githubRequest(
 }
 
 function apiError(status: number, message?: unknown): Error {
-	if (status === 401) return new Error("GitHub rejected GITHUB_AUDIT_TOKEN. Check its token and repository permissions.");
-	if (status === 403) return new Error("GitHub denied the request or its Actions rate limit was reached.");
-	if (status === 404) return new Error("The target repository or Flutter CI workflow was not found, or the token cannot access it.");
-	const detail = typeof message === "string" ? ": " + message.slice(0, 180) : ".";
+	if (status === 401)
+		return new Error(
+			"GitHub rejected GITHUB_AUDIT_TOKEN. Check its token and repository permissions.",
+		);
+	if (status === 403)
+		return new Error(
+			"GitHub denied the request or its Actions rate limit was reached.",
+		);
+	if (status === 404)
+		return new Error(
+			"The target repository or Flutter CI workflow was not found, or the token cannot access it.",
+		);
+	const detail =
+		typeof message === "string" ? ": " + message.slice(0, 180) : ".";
 	return new Error("GitHub API request failed (" + status + ")" + detail);
 }
 
@@ -90,12 +109,32 @@ export function registerGithubFlutterCiTools(register: Registrar) {
 		"flutter_run_github_project_ci",
 		"Run Flutter project CI on GitHub Actions",
 		"Dispatch an on-demand Flutter analysis, test, coverage, and release APK build for an active public GitHub repository. Target code runs without persisted Git checkout credentials or target-specific secrets. Requires GITHUB_AUDIT_TOKEN on the server; maximum 6 MCP-triggered runs per hour.",
-		z.object({
-			targetRepository: z.string().min(3).max(205).refine(isSafeGitHubRepository, "Use owner/repository for a public GitHub repository."),
-			targetRef: z.string().min(1).max(128).refine(isSafeGitHubRef, "Use a valid branch, tag, or commit reference."),
-			flutterChannel: z.enum(["stable", "beta", "main"]).default("stable"),
-		}).strict(),
-		async ({ targetRepository, targetRef, flutterChannel }: {
+		z
+			.object({
+				targetRepository: z
+					.string()
+					.min(3)
+					.max(205)
+					.refine(
+						isSafeGitHubRepository,
+						"Use owner/repository for a public GitHub repository.",
+					),
+				targetRef: z
+					.string()
+					.min(1)
+					.max(128)
+					.refine(
+						isSafeGitHubRef,
+						"Use a valid branch, tag, or commit reference.",
+					),
+				flutterChannel: z.enum(["stable", "beta", "main"]).default("stable"),
+			})
+			.strict(),
+		async ({
+			targetRepository,
+			targetRef,
+			flutterChannel,
+		}: {
 			targetRepository: string;
 			targetRef: string;
 			flutterChannel: "stable" | "beta" | "main";
@@ -105,53 +144,99 @@ export function registerGithubFlutterCiTools(register: Registrar) {
 				return {
 					status: "not_configured",
 					requiredEnvironmentVariable: "GITHUB_AUDIT_TOKEN",
-					message: "Add a fine-grained token to the Vercel Production environment with Actions read/write and Contents read access to TomasThrawat/flutter-foundry, then redeploy. The MCP endpoint itself remains unauthenticated.",
+					message:
+						"Add a fine-grained token to the Vercel Production environment with Actions read/write and Contents read access to TomasThrawat/flutter-foundry, then redeploy. The MCP endpoint itself remains unauthenticated.",
 					workflowUrl: WORKFLOW_URL,
 				};
 			}
 			const parts = targetRepository.split("/");
-			const metadata = await githubRequest(undefined, "/repos/" + parts.map(encodeURIComponent).join("/"));
-			if (metadata.status !== 200) throw apiError(metadata.status, metadata.data?.message);
+			const metadata = await githubRequest(
+				undefined,
+				"/repos/" + parts.map(encodeURIComponent).join("/"),
+			);
+			if (metadata.status !== 200)
+				throw apiError(metadata.status, metadata.data?.message);
 			if (metadata.data?.visibility !== "public")
-				return { status: "rejected", targetRepository, message: "Only public repositories can be built by this workflow.", workflowUrl: WORKFLOW_URL };
+				return {
+					status: "rejected",
+					targetRepository,
+					message: "Only public repositories can be built by this workflow.",
+					workflowUrl: WORKFLOW_URL,
+				};
 			if (metadata.data?.archived === true)
-				return { status: "rejected", targetRepository, message: "The target repository is archived.", workflowUrl: WORKFLOW_URL };
+				return {
+					status: "rejected",
+					targetRepository,
+					message: "The target repository is archived.",
+					workflowUrl: WORKFLOW_URL,
+				};
 
-			const runsPath = "/repos/" + CONTROL_REPOSITORY + "/actions/workflows/" + WORKFLOW_FILE + "/runs?event=workflow_dispatch&per_page=100";
+			const runsPath =
+				"/repos/" +
+				CONTROL_REPOSITORY +
+				"/actions/workflows/" +
+				WORKFLOW_FILE +
+				"/runs?event=workflow_dispatch&per_page=100";
 			const before = await githubRequest(token, runsPath);
-			if (before.status !== 200) throw apiError(before.status, before.data?.message);
-			const existingRuns = Array.isArray(before.data?.workflow_runs) ? before.data.workflow_runs.filter(isWorkflowRun) : [];
+			if (before.status !== 200)
+				throw apiError(before.status, before.data?.message);
+			const existingRuns = Array.isArray(before.data?.workflow_runs)
+				? before.data.workflow_runs.filter(isWorkflowRun)
+				: [];
 			const now = Date.now();
-			const recentCount = existingRuns.filter((run) =>
-				run.event === "workflow_dispatch" &&
-				Number.isFinite(Date.parse(run.created_at)) &&
-				Date.parse(run.created_at) >= now - 60 * 60 * 1000,
+			const recentCount = existingRuns.filter(
+				(run) =>
+					run.event === "workflow_dispatch" &&
+					Number.isFinite(Date.parse(run.created_at)) &&
+					Date.parse(run.created_at) >= now - 60 * 60 * 1000,
 			).length;
 			if (recentCount >= MAX_DISPATCHES_PER_HOUR)
-				return { status: "rate_limited", limit: MAX_DISPATCHES_PER_HOUR, window: "1 hour", workflowUrl: WORKFLOW_URL, message: "The Flutter CI dispatch limit was reached." };
+				return {
+					status: "rate_limited",
+					limit: MAX_DISPATCHES_PER_HOUR,
+					window: "1 hour",
+					workflowUrl: WORKFLOW_URL,
+					message: "The Flutter CI dispatch limit was reached.",
+				};
 
 			const knownRunIds = new Set(existingRuns.map((run) => run.id));
 			const startedAt = Date.now();
 			const dispatch = await githubRequest(
 				token,
-				"/repos/" + CONTROL_REPOSITORY + "/actions/workflows/" + WORKFLOW_FILE + "/dispatches",
+				"/repos/" +
+					CONTROL_REPOSITORY +
+					"/actions/workflows/" +
+					WORKFLOW_FILE +
+					"/dispatches",
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						ref: "main",
-						inputs: { target_repository: targetRepository, target_ref: targetRef, flutter_channel: flutterChannel },
+						inputs: {
+							target_repository: targetRepository,
+							target_ref: targetRef,
+							flutter_channel: flutterChannel,
+						},
 					}),
 				},
 			);
-			if (dispatch.status !== 204) throw apiError(dispatch.status, dispatch.data?.message);
+			if (dispatch.status !== 204)
+				throw apiError(dispatch.status, dispatch.data?.message);
 			await new Promise((resolve) => setTimeout(resolve, 900));
 			const after = await githubRequest(token, runsPath);
 			if (after.status === 200 && Array.isArray(after.data?.workflow_runs)) {
 				const created = after.data.workflow_runs
 					.filter(isWorkflowRun)
-					.filter((run) => !knownRunIds.has(run.id) && run.event === "workflow_dispatch" && Date.parse(run.created_at) >= startedAt - 10_000)
-					.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+					.filter(
+						(run) =>
+							!knownRunIds.has(run.id) &&
+							run.event === "workflow_dispatch" &&
+							Date.parse(run.created_at) >= startedAt - 10_000,
+					)
+					.sort(
+						(a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+					)[0];
 				if (created)
 					return {
 						status: created.status,
@@ -162,7 +247,12 @@ export function registerGithubFlutterCiTools(register: Registrar) {
 						flutterChannel,
 						runUrl: created.html_url,
 						workflowUrl: WORKFLOW_URL,
-						rateLimit: (recentCount + 1) + "/" + MAX_DISPATCHES_PER_HOUR + " MCP-triggered runs in the last hour",
+						rateLimit:
+							recentCount +
+							1 +
+							"/" +
+							MAX_DISPATCHES_PER_HOUR +
+							" MCP-triggered runs in the last hour",
 						note: "Open the run URL to follow Flutter analysis, tests, APK build, and the uploaded artifact.",
 					};
 			}
@@ -172,7 +262,12 @@ export function registerGithubFlutterCiTools(register: Registrar) {
 				targetRef,
 				flutterChannel,
 				workflowUrl: WORKFLOW_URL,
-				rateLimit: (recentCount + 1) + "/" + MAX_DISPATCHES_PER_HOUR + " MCP-triggered runs in the last hour",
+				rateLimit:
+					recentCount +
+					1 +
+					"/" +
+					MAX_DISPATCHES_PER_HOUR +
+					" MCP-triggered runs in the last hour",
 				note: "GitHub accepted the dispatch. Open the workflow URL; the run may take a few seconds to appear.",
 			};
 		},

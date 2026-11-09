@@ -15,6 +15,8 @@ This repository commits `package-lock.json` (lockfile version 3). It is generate
 
 The `checks` and `svg-edit-browser` GitHub Actions jobs use `npm ci --legacy-peer-deps` with a fresh per-job npm cache. The legacy peer flag is retained because plain npm peer resolution reports `@modelcontextprotocol/server@undefined` while resolving its peer dependency with `mcp-handler@2.3.0`. The same flag is used when generating the committed lockfile and when running `npm ci`, keeping the dependency tree reproducible. This compatibility workaround is not proof of application correctness: typechecking, dependency audit, tests, lint, production build, and Playwright still have to pass.
 
+The tag-triggered `.github/workflows/release.yml` disables `setup-node` package-manager caching and omits its `cache` input. Release installs use only the runner-local temporary npm cache, so a tagged release does not restore or publish a shared cross-run dependency cache.
+
 Scanner CLIs install in a writable per-job temporary directory. No paid API credentials are used. Network access is needed for release downloads, public Semgrep rules, and vulnerability data. Scanner binaries are not installed in the deployed Vercel runtime.
 
 Run the scanner on Linux x86_64 with curl, tar, sha256sum, Python 3 with venv, Node/npm, Docker, and network access:
