@@ -476,7 +476,6 @@ export function generateIconFromPrompt(
 			circle(300, 408, 10, accent);
 		}
 	} else if (concept === "phone") {
-		path(	} else if (concept === "phone") {
 		path(
 			"M145 83 C126 83 107 100 105 123 C98 198 155 294 220 354 C285 414 365 441 411 408 C431 394 439 369 425 350 L382 294 C370 278 350 274 333 284 L294 308 C268 294 225 254 205 224 L229 190 C239 175 237 157 225 144 L178 96 C169 87 157 83 145 83 Z",
 			main,
@@ -571,7 +570,6 @@ export function generateIconFromPrompt(
 		circle(256, 304, 25, outline ? "none" : accent, outline ? fg : "none", outline ? 11 : 0);
 		rect(246, 326, 20, 54, outline ? "none" : accent, 8, outline ? fg : "none", outline ? 8 : 0);
 	} else if (concept === "shield") {
-		path(	} else if (concept === "shield") {
 		path(
 			"M256 64 L402 122 L386 282 C370 352 322 411 256 450 C190 411 142 352 126 282 L110 122 Z",
 			main,
