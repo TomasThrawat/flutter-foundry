@@ -84,7 +84,7 @@ test("quality analysis samples an opaque canvas background from the border", asy
 });
 
 test("quality analysis reports a fully transparent canvas with no visible artwork", async () => {
-  const emptySvg = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"></svg>';
+  const emptySvg = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><path d="M10 10 H20 V20 Z" fill="none" stroke="none"/></svg>';
   const report = await analyzeIconQuality(emptySvg);
   assert.ok(report.findings.some((finding) => finding.code === "no-visible-artwork"));
   assert.equal(report.metrics.artworkWidth, 0);
