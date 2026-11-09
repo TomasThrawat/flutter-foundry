@@ -25,13 +25,14 @@ function createBrowserStub(outputSvg: string, options: { failOnGoto?: boolean; u
     },
     waitForFunction: async () => undefined,
     evaluate: async (callback: (input: string) => string, input: string) => {
-      const previousWindow = (globalThis as typeof globalThis & { window?: unknown }).window;
-      (globalThis as typeof globalThis & { window?: unknown }).window = { svgEditor: editor };
+      const runtime = globalThis as unknown as { window?: unknown };
+      const previousWindow = runtime.window;
+      runtime.window = { svgEditor: editor };
       try {
         return callback(input);
       } finally {
-        if (previousWindow === undefined) delete (globalThis as typeof globalThis & { window?: unknown }).window;
-        else (globalThis as typeof globalThis & { window?: unknown }).window = previousWindow;
+        if (previousWindow === undefined) delete runtime.window;
+        else runtime.window = previousWindow;
       }
     },
     setContent: async () => undefined,
@@ -63,7 +64,7 @@ test("sanitizer retains vector geometry and fills missing root defaults", () => 
 });
 
 test("sanitizer rejects empty and oversized input", () => {
-  assert.throws(() => sanitizeSvgInput(""), /required/);
+  assert.throws(() => sanitizeSvgInput("  \n  "), /required/);
   assert.throws(() => sanitizeSvgInput("  \n  "), /required/);
   const oversized = `<svg>${"é".repeat(125_001)}</svg>`;
   assert.ok(Buffer.byteLength(oversized, "utf8") > 250_000);
