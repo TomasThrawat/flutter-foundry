@@ -74,7 +74,6 @@ Static findings are advisory. The tools do not claim a Flutter build or device t
 - Tools: list skills, load a skill, read a supporting file, search skill summaries, compose a workflow, and validate workflow guardrails.
 - Source is pinned to an immutable upstream Superpowers v7.0.1 commit. Skill files are fetched read-only, with path checks and request timeouts. See docs/superpowers-mcp.md.
 
-
 ### Flutter analysis
 
 When a local machine or MCP host has the Flutter SDK installed, flutter-analyze runs the fixed, read-only command flutter analyze --no-pub. The target must be within AUDIT_ALLOWED_ROOTS and contain pubspec.yaml. The hosted Vercel deployment does not include the Flutter SDK; there the engine reports not_installed and build-log triage remains available.
