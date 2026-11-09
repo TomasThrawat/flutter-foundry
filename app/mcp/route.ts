@@ -33,7 +33,7 @@ export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const handler = createMcpHandler((server) => {
-	const register = <TInput,>(
+	const register = <TInput>(
 		name: string,
 		title: string,
 		description: string,
@@ -961,21 +961,27 @@ const handler = createMcpHandler((server) => {
 				operations: z
 					.array(
 						z.discriminatedUnion("action", [
-							z.object({
-								id: z.string().min(1).max(128),
-								action: z.literal("set-attributes"),
-								attributes: z.record(z.string(), z.string()),
-							}).strict(),
-							z.object({
-								id: z.string().min(1).max(128),
-								action: z.literal("remove-attributes"),
-								removeAttributes: z.array(z.string()).min(1).max(12),
-							}).strict(),
-							z.object({
-								id: z.string().min(1).max(128),
-								action: z.literal("remove-element"),
-							}).strict(),
-					])
+							z
+								.object({
+									id: z.string().min(1).max(128),
+									action: z.literal("set-attributes"),
+									attributes: z.record(z.string(), z.string()),
+								})
+								.strict(),
+							z
+								.object({
+									id: z.string().min(1).max(128),
+									action: z.literal("remove-attributes"),
+									removeAttributes: z.array(z.string()).min(1).max(12),
+								})
+								.strict(),
+							z
+								.object({
+									id: z.string().min(1).max(128),
+									action: z.literal("remove-element"),
+								})
+								.strict(),
+						]),
 					)
 					.min(1)
 					.max(20),

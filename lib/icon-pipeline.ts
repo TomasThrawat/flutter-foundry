@@ -1,5 +1,10 @@
 import { deflateRawSync } from "node:zlib";
-import { DOMParser, XMLSerializer, type Document as XmlDocument, type Element as XmlElement } from "@xmldom/xmldom";
+import {
+	DOMParser,
+	XMLSerializer,
+	type Document as XmlDocument,
+	type Element as XmlElement,
+} from "@xmldom/xmldom";
 import sharp from "sharp";
 import {
 	generateIconFromPrompt,

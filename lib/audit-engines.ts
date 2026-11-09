@@ -1026,10 +1026,9 @@ export function registerAuditTools(register: AuditToolRegistrar) {
 			engines?: string[];
 		}) => {
 			const root = resolveRepo(repositoryPath);
-			const selected =
-				engines?.length
-					? [...new Set(engines)]
-					: Object.keys(RUNNERS);
+			const selected = engines?.length
+				? [...new Set(engines)]
+				: Object.keys(RUNNERS);
 			const checks = await Promise.all(
 				selected.map(async (id) => ({
 					id,

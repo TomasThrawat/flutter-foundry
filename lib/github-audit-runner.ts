@@ -118,7 +118,8 @@ function apiError(status: number, message?: unknown): Error {
 		return new Error(
 			"The target repository or audit workflow was not found, or the token cannot access it.",
 		);
-	const detail = typeof message === "string" ? `: ${message.slice(0, 180)}` : ".";
+	const detail =
+		typeof message === "string" ? `: ${message.slice(0, 180)}` : ".";
 	return new Error(`GitHub API request failed (${status})${detail}`);
 }
 
