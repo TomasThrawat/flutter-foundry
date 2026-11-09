@@ -158,8 +158,8 @@ test("vectorizes a small raster image into editable SVG rectangles and PNG previ
 });
 
 test("preserves partial alpha as SVG opacity and in the PNG preview", async () => {
-  const width = 12;
-  const height = 12;
+  const width = 24;
+  const height = 24;
   const pixels = Buffer.alloc(width * height * 4);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
