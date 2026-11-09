@@ -19,17 +19,32 @@ on:
         description: Scanner to run
         required: true
         type: choice
-        options: [all, trivy, gitleaks, semgrep, osv-scanner, zizmor, ruff, shellcheck, biome]
+        options:
+          [
+            all,
+            trivy,
+            gitleaks,
+            semgrep,
+            osv-scanner,
+            zizmor,
+            ruff,
+            shellcheck,
+            biome,
+          ]
         default: all
 
 permissions:
   contents: read
+env:
+  GIT_CONFIG_COUNT: 1
+  GIT_CONFIG_KEY_0: init.defaultBranch
+  GIT_CONFIG_VALUE_0: main
 concurrency:
   group: audit-${{ github.event.pull_request.number || inputs.target_repository || github.repository }}
   cancel-in-progress: false
 jobs:
   scan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -90,7 +105,7 @@ jobs:
           AUDIT_ENGINE: ${{ env.AUDIT_ENGINE }}
       - name: Upload audit reports
         if: always() && steps.scanner.outputs.available == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: audit-report-${{ github.run_id }}
           path: ${{ runner.temp }}/flutter-foundry-audit-reports/

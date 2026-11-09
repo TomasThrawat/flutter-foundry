@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+env:
+  GIT_CONFIG_COUNT: 1
+  GIT_CONFIG_KEY_0: init.defaultBranch
+  GIT_CONFIG_VALUE_0: main
+
 concurrency:
   group: flutter-foundry-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -16,7 +21,7 @@ concurrency:
 jobs:
   security-scan:
     name: Security scanners
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.2.2
@@ -35,7 +40,7 @@ jobs:
 
   checks:
     needs: security-scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.2.2
@@ -45,19 +50,21 @@ jobs:
         with:
           node-version: 24
       - name: Install dependencies (known npm peer-resolution quirk)
-        run: npm install --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
+        run: npm ci --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
       - name: Audit dependencies
         run: npm audit --audit-level=moderate
       - run: npm run typecheck
       - name: Validate audit runner shell syntax
         run: bash -n .github/scripts/run-audit.sh .github/scripts/security-scan.sh
       - run: npm test
+      - name: Measure icon pipeline test coverage
+        run: npm run test:icons:coverage
       - run: npm run lint
       - run: npm run build
 
   svg-edit-browser:
     needs: security-scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.2.2
@@ -67,6 +74,6 @@ jobs:
         with:
           node-version: 24
       - name: Install dependencies (known npm peer-resolution quirk)
-        run: npm install --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
+        run: npm ci --legacy-peer-deps --cache "$RUNNER_TEMP/npm-cache"
       - run: npx playwright install --with-deps chromium
       - run: npm run test:svg-edit
