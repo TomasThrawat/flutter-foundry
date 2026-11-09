@@ -1,4 +1,5 @@
 # Architecture
+
 - Next.js hosts the landing page, SVG workspace, health endpoint, and stateless MCP endpoint.
 - MCP tools use deterministic analysis functions, live pub.dev package metadata, and OSV vulnerability data.
 - SVG processing sanitizes user markup, launches Playwright Chromium, opens the trusted upstream SVG-Edit deployment, imports markup through SVG-Edit's own editor API, serializes the canvas and captures a PNG.

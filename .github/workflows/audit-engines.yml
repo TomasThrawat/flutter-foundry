@@ -19,7 +19,18 @@ on:
         description: Scanner to run
         required: true
         type: choice
-        options: [all, trivy, gitleaks, semgrep, osv-scanner, zizmor, ruff, shellcheck, biome]
+        options:
+          [
+            all,
+            trivy,
+            gitleaks,
+            semgrep,
+            osv-scanner,
+            zizmor,
+            ruff,
+            shellcheck,
+            biome,
+          ]
         default: all
 
 permissions:
