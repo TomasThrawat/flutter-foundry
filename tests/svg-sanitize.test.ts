@@ -25,14 +25,13 @@ function createBrowserStub(outputSvg: string, options: { failOnGoto?: boolean; u
     },
     waitForFunction: async () => undefined,
     evaluate: async (callback: (input: string) => string, input: string) => {
-      const runtime = globalThis as unknown as { window?: unknown };
-      const previousWindow = runtime.window;
-      runtime.window = { svgEditor: editor };
+      const previousWindow = Reflect.get(globalThis, "window");
+      Reflect.set(globalThis, "window", { svgEditor: editor });
       try {
         return callback(input);
       } finally {
-        if (previousWindow === undefined) delete runtime.window;
-        else runtime.window = previousWindow;
+        if (previousWindow === undefined) Reflect.deleteProperty(globalThis, "window");
+        else Reflect.set(globalThis, "window", previousWindow);
       }
     },
     setContent: async () => undefined,
