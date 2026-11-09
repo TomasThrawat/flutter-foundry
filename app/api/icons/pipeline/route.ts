@@ -11,7 +11,7 @@ import {
 } from "@/lib/icon-pipeline";
 import { renderIconPng } from "@/lib/icon-png";
 import {
-	bestEffortRateLimit,
+	enforceRateLimit,
 	RequestBodyTooLargeError,
 	readJsonBodyLimited,
 } from "@/lib/request-guards";
@@ -24,7 +24,7 @@ function fail(message: string, status = 400) {
 }
 
 export async function POST(request: Request) {
-	const limited = bestEffortRateLimit(request, "icon-pipeline", 30, 60_000);
+	const limited = await enforceRateLimit(request, "icon-pipeline", 30, 60_000);
 	if (limited) return limited;
 	try {
 		const body = await readJsonBodyLimited<Record<string, unknown>>(

@@ -77,3 +77,27 @@ test("recognizes send, trash and phone icons in English and Arabic", () => {
 		assert.match(generated.svgMarkup, /<path|<rect/);
 	}
 });
+
+
+test("recognizes additional utility concepts in English and Arabic", () => {
+	const cases = [
+		{ prompt: "minimal wireless headphones icon", concept: "headphones" },
+		{ prompt: "أيقونة سماعات رأس لاسلكية", concept: "headphones" },
+		{ prompt: "simple padlock symbol", concept: "lock" },
+		{ prompt: "أيقونة قفل أمان", concept: "lock" },
+		{ prompt: "minimal clock icon", concept: "clock" },
+		{ prompt: "download arrow icon", concept: "download" },
+		{ prompt: "أيقونة تنزيل الملفات", concept: "download" },
+		{ prompt: "upload file icon", concept: "upload" },
+		{ prompt: "أيقونة رفع ملف", concept: "upload" },
+		{ prompt: "computer keyboard icon", concept: "keyboard" },
+		{ prompt: "أيقونة لوحة المفاتيح", concept: "keyboard" },
+		{ prompt: "PDF document icon", concept: "document" },
+		{ prompt: "أيقونة مستند PDF", concept: "document" },
+	];
+	for (const item of cases) {
+		const generated = generateIconFromPrompt({ prompt: item.prompt, style: "minimal" });
+		assert.equal(generated.concept, item.concept, item.prompt);
+		assert.match(sanitizeSvgInput(generated.svgMarkup), /^<svg/);
+	}
+});

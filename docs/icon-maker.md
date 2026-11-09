@@ -4,7 +4,7 @@ Flutter Foundry exposes a unified icon workflow at /icon-maker and through the /
 
 ## Capabilities
 
-- Prompt-driven deterministic SVG generation with minimal, geometric, rounded, outline, pixel and abstract styles. Common send/paper-plane, trash and phone concepts are recognized in English and Arabic; unsupported subjects deliberately fall back to abstract geometry rather than claiming semantic image understanding. The procedural generator does not call a paid image API.
+- Prompt-driven deterministic SVG generation with minimal, geometric, rounded, outline, pixel and abstract styles. The English/Arabic concept vocabulary includes headphones, lock, download, upload, keyboard and document shapes in addition to the existing concepts. Common send/paper-plane, trash and phone concepts are recognized in English and Arabic; unsupported subjects deliberately fall back to abstract geometry rather than claiming semantic image understanding. The procedural generator does not call a paid image API.
 - Multi-style variants from one prompt, with PNG previews for direct comparison.
 - SVG element preparation with stable IDs and targeted safe edits. Only selected elements are changed; supported operations are set attributes, remove attributes and remove element.
 - Automated heuristic quality report for viewBox shape, visible artwork bounds, margins, centering, element count and approximate rendered palette size. The UI also previews common launcher masks and 32/48/64-pixel legibility. Scores and findings are advisory.

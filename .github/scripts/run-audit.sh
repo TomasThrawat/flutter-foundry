@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
+FAILED=0
+
 TARGET_DIR="${1:-target}"
 ENGINE="${AUDIT_ENGINE:-all}"
 REPORT_DIR="$RUNNER_TEMP/flutter-foundry-audit-reports"
@@ -26,6 +28,7 @@ run_scan() {
     printf '%s command completed (exit 0).\n' "$name"
   else
     printf '%s exited %s; inspect its report and log.\n' "$name" "$code"
+    FAILED=1
   fi
   return 0
 }
@@ -43,6 +46,7 @@ run_scan_json() {
     printf '%s command completed (exit 0).\n' "$name"
   else
     printf '%s exited %s; inspect %s and %s.\n' "$name" "$code" "$report" "$log"
+    FAILED=1
   fi
   return 0
 }
@@ -53,7 +57,7 @@ if should_run trivy; then
   run_scan trivy docker run --rm \
     -v "$PWD/$TARGET_DIR:/src:ro" \
     -v "$REPORT_DIR:/out" \
-    aquasec/trivy:latest fs --scanners vuln,misconfig --skip-dirs .git \
+    aquasec/trivy:0.76.2 fs --scanners vuln,misconfig --skip-dirs .git --severity HIGH,CRITICAL --exit-code 1 \
     --format json --output /out/trivy.json /src
 fi
 
@@ -61,7 +65,7 @@ if should_run gitleaks; then
   run_scan gitleaks docker run --rm \
     -v "$PWD/$TARGET_DIR:/src:ro" \
     -v "$REPORT_DIR:/out" \
-    ghcr.io/gitleaks/gitleaks:v8.30.1 dir \
+    ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:b109bc5f8f76a38196a3e413704fc5b9e3c32360bce4e4b603bd6f45b3721dbb dir \
     --redact --report-format json --report-path /out/gitleaks.json /src
 fi
 
@@ -69,7 +73,7 @@ if should_run semgrep; then
   run_scan semgrep docker run --rm \
     -v "$PWD/$TARGET_DIR:/src:ro" \
     -v "$REPORT_DIR:/out" \
-    semgrep/semgrep:latest semgrep scan --config auto --json \
+    semgrep/semgrep:1.182.1 semgrep scan --config auto --json --error --severity ERROR \
     --output /out/semgrep.json /src
 fi
 
@@ -85,7 +89,7 @@ if should_run osv-scanner; then
     run_scan_json osv-scanner "$REPORT_DIR/osv-scanner.json" docker run --rm \
       -v "$PWD/$TARGET_DIR:/src:ro" \
       -v "$REPORT_DIR:/out" \
-      ghcr.io/google/osv-scanner:v2.3.3 scan source -r /src --format json
+      ghcr.io/google/osv-scanner:v2.7.0-amd64@sha256:d2c46aa2483c4e02759bc25f2224d28a5ceeb3dca5a1ecd1f569fbed83a626f0 scan source -r /src --format json
   else
     printf 'osv-scanner\tSKIPPED\n' >> "$SUMMARY_FILE"
     printf '{"status":"skipped","reason":"No supported lockfile or SBOM was found."}\n' > "$REPORT_DIR/osv-scanner.json"
@@ -154,7 +158,7 @@ fi
   echo "- Target: $TARGET_REPOSITORY@$TARGET_REF"
   echo "- Engine selection: $ENGINE"
   echo "- The workflow scans source files without running target build scripts or dependency-install scripts."
-  echo "- Exit codes are not vulnerability verdicts: review each JSON report and diagnostic log."
+  echo "- Non-zero scanner results fail this workflow; review each report and log to distinguish findings from tool execution errors."
   echo
   echo "| Scanner | Exit code/status |"
   echo "|---|---:|"
@@ -175,4 +179,8 @@ fi
 
 cat "$REPORT_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
 echo "Audit complete. Detailed reports are in $REPORT_DIR."
+if [[ "$FAILED" -ne 0 ]]; then
+  echo "One or more selected scanners reported findings or execution errors; review the uploaded artifact."
+  exit 1
+fi
 exit 0
