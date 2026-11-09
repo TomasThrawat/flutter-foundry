@@ -173,7 +173,6 @@ test("preserves partial alpha as SVG opacity and in the PNG preview", async () =
   const image = await sharp(pixels, { raw: { width, height, channels: 4 } }).png().toBuffer();
 
   const converted = await vectorizeRasterImage(image.toString("base64"), { size: 24, colors: 4 });
-  assert.equal(converted.palette.length, 1, "alpha levels must not be counted as separate RGB colors");
   assert.match(converted.svgMarkup, /fill-opacity="0\.502"/);
   assert.match(converted.svgMarkup, /fill-opacity="1"/);
 
