@@ -275,7 +275,7 @@ export function checkLocalizations(
 			missing,
 			extra,
 			placeholderMismatches,
-			locale: declaredLocale,
+			declaredLocale,
 			direction: isRtlLocale(declaredLocale) ? "rtl" : "ltr",
 			localeMismatch,
 			complete: missing.length === 0 && placeholderMismatches.length === 0 && !localeMismatch,
