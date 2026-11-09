@@ -158,13 +158,19 @@ test("vectorizes a small raster image into editable SVG rectangles and PNG previ
 });
 
 test("preserves partial alpha as SVG opacity and in the PNG preview", async () => {
-  const image = await sharp({
-    create: { width: 12, height: 12, channels: 4, background: { r: 240, g: 80, b: 20, alpha: 0.5 } }
-  }).composite([{
-    input: { create: { width: 6, height: 12, channels: 4, background: { r: 240, g: 80, b: 20, alpha: 1 } } },
-    left: 3,
-    top: 0
-  }]).png().toBuffer();
+  const width = 12;
+  const height = 12;
+  const pixels = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const offset = (y * width + x) * 4;
+      pixels[offset] = 240;
+      pixels[offset + 1] = 80;
+      pixels[offset + 2] = 20;
+      pixels[offset + 3] = x < width / 2 ? 128 : 255;
+    }
+  }
+  const image = await sharp(pixels, { raw: { width, height, channels: 4 } }).png().toBuffer();
 
   const converted = await vectorizeRasterImage(image.toString("base64"), { size: 24, colors: 4 });
   assert.equal(converted.palette.length, 1, "alpha levels must not be counted as separate RGB colors");
