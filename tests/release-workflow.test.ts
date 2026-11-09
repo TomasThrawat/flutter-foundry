@@ -9,7 +9,7 @@ const releaseWorkflow = readFileSync(
 
 test("release workflow does not share package-manager caches between tagged runs", () => {
 	const setupNodeStep = releaseWorkflow.match(
-		/- name: Set up Node\.js[\s\S]*?(?=\n      - name:|\n\n)/,
+		/- name: Set up Node\.js[\s\S]*?(?=\n[ ]{6}- name:|\n\n)/,
 	)?.[0];
 
 	assert.ok(setupNodeStep, "missing Node.js setup step");

@@ -110,7 +110,6 @@ export function bestEffortRateLimit(
 	return null;
 }
 
-
 /**
  * Optional Upstash REST counter for cross-instance throttling.
  * Without Redis configuration, retain the bounded per-process fallback.
@@ -128,7 +127,10 @@ export async function enforceRateLimit(
 		return bestEffortRateLimit(request, routeKey, limit, windowMs);
 	if (!redisUrl || !redisToken)
 		return Response.json(
-			{ error: "Global rate limiting is misconfigured. Set both Upstash REST environment variables." },
+			{
+				error:
+					"Global rate limiting is misconfigured. Set both Upstash REST environment variables.",
+			},
 			{ status: 503, headers: { "Cache-Control": "no-store" } },
 		);
 	if (
@@ -154,7 +156,9 @@ export async function enforceRateLimit(
 		endpoint = new URL(redisUrl);
 	} catch {
 		return Response.json(
-			{ error: "UPSTASH_REDIS_REST_URL must be a valid HTTPS Upstash REST URL." },
+			{
+				error: "UPSTASH_REDIS_REST_URL must be a valid HTTPS Upstash REST URL.",
+			},
 			{ status: 503, headers: { "Cache-Control": "no-store" } },
 		);
 	}
@@ -188,7 +192,8 @@ export async function enforceRateLimit(
 			signal: AbortSignal.timeout(3000),
 			cache: "no-store",
 		});
-		if (!response.ok) throw new Error("Upstash returned HTTP " + response.status + ".");
+		if (!response.ok)
+			throw new Error("Upstash returned HTTP " + response.status + ".");
 		const payload: unknown = await response.json();
 		if (
 			!payload ||
@@ -213,7 +218,10 @@ export async function enforceRateLimit(
 		);
 	} catch {
 		return Response.json(
-			{ error: "The configured global rate-limit service is temporarily unavailable." },
+			{
+				error:
+					"The configured global rate-limit service is temporarily unavailable.",
+			},
 			{ status: 503, headers: { "Cache-Control": "no-store" } },
 		);
 	}

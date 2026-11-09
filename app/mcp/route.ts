@@ -10,7 +10,6 @@ import {
 import { registerAuditTools } from "@/lib/audit-engines";
 import { registerGithubAuditTools } from "@/lib/github-audit-runner";
 import { registerGithubFlutterCiTools } from "@/lib/github-flutter-ci-runner";
-import { enforceRateLimit } from "@/lib/request-guards";
 import { generateIconFromPrompt } from "@/lib/icon-generator";
 import {
 	analyzeIconQuality,
@@ -22,6 +21,7 @@ import {
 	vectorizeRasterImage,
 } from "@/lib/icon-pipeline";
 import { renderIconPng, validateCustomIconSvg } from "@/lib/icon-png";
+import { enforceRateLimit } from "@/lib/request-guards";
 import {
 	getPubPackage,
 	queryOsvPackages,

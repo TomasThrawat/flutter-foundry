@@ -78,6 +78,25 @@ test("recognizes send, trash and phone icons in English and Arabic", () => {
 	}
 });
 
+test("renders complete camera, code, and book icon details", () => {
+	const camera = generateIconFromPrompt({ prompt: "camera icon" });
+	assert.match(
+		camera.svgMarkup,
+		/<rect x="154" y="132" width="92" height="56"/,
+	);
+	assert.match(camera.svgMarkup, /<circle cx="260" cy="286" r="63"/);
+
+	const code = generateIconFromPrompt({ prompt: "code icon" });
+	assert.match(code.svgMarkup, /<path d="M310 154 L408 256 L310 358"/);
+	assert.match(code.svgMarkup, /<path d="M282 126 L230 386"/);
+
+	const book = generateIconFromPrompt({ prompt: "book icon" });
+	assert.match(
+		book.svgMarkup,
+		/<path d="M426 126 Q344 96 262 148 V388 Q344 336 426 366 Z"/,
+	);
+	assert.match(book.svgMarkup, /<line x1="256" y1="150" x2="256" y2="389"/);
+});
 
 test("recognizes additional utility concepts in English and Arabic", () => {
 	const cases = [
@@ -96,7 +115,10 @@ test("recognizes additional utility concepts in English and Arabic", () => {
 		{ prompt: "أيقونة مستند PDF", concept: "document" },
 	];
 	for (const item of cases) {
-		const generated = generateIconFromPrompt({ prompt: item.prompt, style: "minimal" });
+		const generated = generateIconFromPrompt({
+			prompt: item.prompt,
+			style: "minimal",
+		});
 		assert.equal(generated.concept, item.concept, item.prompt);
 		assert.match(sanitizeSvgInput(generated.svgMarkup), /^<svg/);
 	}
