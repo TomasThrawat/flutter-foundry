@@ -1,5 +1,9 @@
+import {
+	bestEffortRateLimit,
+	RequestBodyTooLargeError,
+	readJsonBodyLimited,
+} from "@/lib/request-guards";
 import { runSvgEdit } from "@/lib/svg-edit";
-import { bestEffortRateLimit, readJsonBodyLimited, RequestBodyTooLargeError } from "@/lib/request-guards";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 export async function POST(request: Request) {
@@ -12,7 +16,10 @@ export async function POST(request: Request) {
 			{ status: 401 },
 		);
 	try {
-		const body = await readJsonBodyLimited<{ svg?: unknown }>(request, 300 * 1024);
+		const body = await readJsonBodyLimited<{ svg?: unknown }>(
+			request,
+			300 * 1024,
+		);
 		if (typeof body.svg !== "string")
 			return Response.json(
 				{ error: "Provide an SVG string in the svg field." },
