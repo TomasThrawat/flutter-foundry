@@ -145,10 +145,7 @@ function parseSvg(svgMarkup: string): {
 	return { doc, root, clean: new XMLSerializer().serializeToString(root) };
 }
 function allElements(root: XmlElement): XmlElement[] {
-	return [
-		root,
-		...Array.from(root.getElementsByTagName("*")),
-	];
+	return [root, ...Array.from(root.getElementsByTagName("*"))];
 }
 function serialize(root: XmlElement): string {
 	return new XMLSerializer().serializeToString(root);
@@ -870,7 +867,8 @@ export function svgToAndroidVectorDrawable(
 	const backgroundRect = Array.from(root.childNodes).find(
 		(node) =>
 			node.nodeType === 1 &&
-			((node as XmlElement).localName || (node as XmlElement).nodeName) === "rect" &&
+			((node as XmlElement).localName || (node as XmlElement).nodeName) ===
+				"rect" &&
 			Math.abs(parseNumber(node as XmlElement, "x")) < 0.001 &&
 			Math.abs(parseNumber(node as XmlElement, "y")) < 0.001 &&
 			Math.abs(parseNumber(node as XmlElement, "width") - vw) < 0.01 &&
@@ -889,7 +887,9 @@ export function svgToAndroidVectorDrawable(
 		if (tag === "svg")
 			return Array.from(element.childNodes)
 				.map((child) =>
-					child.nodeType === 1 ? renderNode(child as XmlElement, inherited) : "",
+					child.nodeType === 1
+						? renderNode(child as XmlElement, inherited)
+						: "",
 				)
 				.join("");
 		if (tag === "g") {
