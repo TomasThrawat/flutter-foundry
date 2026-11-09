@@ -1,7 +1,7 @@
 import { createMcpHandler } from "mcp-handler";
 import type { z } from "zod";
-import { registerSuperpowersTools } from "@/lib/superpowers";
 import { enforceRateLimit } from "@/lib/request-guards";
+import { registerSuperpowersTools } from "@/lib/superpowers";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -46,13 +46,23 @@ const handler = createMcpHandler((server) => {
 });
 
 export async function GET(request: Request) {
-	const limited = await enforceRateLimit(request, "superpowers-mcp", 120, 60_000);
+	const limited = await enforceRateLimit(
+		request,
+		"superpowers-mcp",
+		120,
+		60_000,
+	);
 	if (limited) return limited;
 	return handler(request);
 }
 
 export async function POST(request: Request) {
-	const limited = await enforceRateLimit(request, "superpowers-mcp", 120, 60_000);
+	const limited = await enforceRateLimit(
+		request,
+		"superpowers-mcp",
+		120,
+		60_000,
+	);
 	if (limited) return limited;
 	return handler(request);
 }

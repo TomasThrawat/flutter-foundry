@@ -62,7 +62,6 @@ test("does not apply a shared anonymous bucket when no proxy address is availabl
 	);
 });
 
-
 test("uses the optional Upstash global limiter and returns 429 above the shared limit", async () => {
 	const oldUrl = process.env.UPSTASH_REDIS_REST_URL;
 	const oldToken = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -70,7 +69,9 @@ test("uses the optional Upstash global limiter and returns 429 above the shared 
 	process.env.UPSTASH_REDIS_REST_URL = "https://example.upstash.io";
 	process.env.UPSTASH_REDIS_REST_TOKEN = "test-token";
 	globalThis.fetch = (async () =>
-		new Response(JSON.stringify({ result: [3, 42] }), { status: 200 })) as typeof fetch;
+		new Response(JSON.stringify({ result: [3, 42] }), {
+			status: 200,
+		})) as typeof fetch;
 	try {
 		const limited = await enforceRateLimit(
 			new Request("https://example.test/mcp", {
@@ -136,7 +137,6 @@ test("rejects non-Upstash or non-HTTPS Redis endpoints", async () => {
 		else process.env.UPSTASH_REDIS_REST_TOKEN = oldToken;
 	}
 });
-
 
 test("fails closed when the global limiter cannot identify a client IP", async () => {
 	const oldUrl = process.env.UPSTASH_REDIS_REST_URL;

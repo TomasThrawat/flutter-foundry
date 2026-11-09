@@ -182,7 +182,8 @@ export async function POST(request: Request) {
 			return new Response(archive, {
 				headers: {
 					"content-type": "application/zip",
-					"content-disposition": 'attachment; filename="flutter-foundry-icon-pack.zip"',
+					"content-disposition":
+						'attachment; filename="flutter-foundry-icon-pack.zip"',
 					"x-icon-file-count": String(bundle.fileCount),
 					"x-icon-bytes": String(bundle.bytes),
 					"cache-control": "no-store",

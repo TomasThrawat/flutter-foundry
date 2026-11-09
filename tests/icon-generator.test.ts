@@ -78,7 +78,6 @@ test("recognizes send, trash and phone icons in English and Arabic", () => {
 	}
 });
 
-
 test("recognizes additional utility concepts in English and Arabic", () => {
 	const cases = [
 		{ prompt: "minimal wireless headphones icon", concept: "headphones" },
@@ -96,17 +95,28 @@ test("recognizes additional utility concepts in English and Arabic", () => {
 		{ prompt: "أيقونة مستند PDF", concept: "document" },
 	];
 	for (const item of cases) {
-		const generated = generateIconFromPrompt({ prompt: item.prompt, style: "minimal" });
+		const generated = generateIconFromPrompt({
+			prompt: item.prompt,
+			style: "minimal",
+		});
 		assert.equal(generated.concept, item.concept, item.prompt);
 		assert.match(sanitizeSvgInput(generated.svgMarkup), /^<svg/);
 	}
 });
 
-
 test("renders complete camera, code and book concept geometry", () => {
-	const camera = generateIconFromPrompt({ prompt: "minimal camera icon", style: "minimal" });
-	const code = generateIconFromPrompt({ prompt: "code brackets with slash icon", style: "minimal" });
-	const book = generateIconFromPrompt({ prompt: "open book icon", style: "minimal" });
+	const camera = generateIconFromPrompt({
+		prompt: "minimal camera icon",
+		style: "minimal",
+	});
+	const code = generateIconFromPrompt({
+		prompt: "code brackets with slash icon",
+		style: "minimal",
+	});
+	const book = generateIconFromPrompt({
+		prompt: "open book icon",
+		style: "minimal",
+	});
 	assert.equal(camera.concept, "camera");
 	assert.ok((camera.svgMarkup.match(/<rect /g) || []).length >= 2);
 	assert.ok((camera.svgMarkup.match(/<circle /g) || []).length >= 3);

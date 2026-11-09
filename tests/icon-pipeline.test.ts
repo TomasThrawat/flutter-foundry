@@ -94,46 +94,111 @@ test("adds safe SVG primitives, edits their geometry and removes selected elemen
 	const prepared = prepareEditableSvg(sample);
 	const inserted = editSvgElements(prepared.svgMarkup, [
 		{
-			id: "ff-added-circle", action: "add-element", tag: "circle",
-			attributes: { cx: "256", cy: "256", r: "42", fill: "#ff0000", opacity: "0.8" },
+			id: "ff-added-circle",
+			action: "add-element",
+			tag: "circle",
+			attributes: {
+				cx: "256",
+				cy: "256",
+				r: "42",
+				fill: "#ff0000",
+				opacity: "0.8",
+			},
 		},
 		{
-			id: "ff-added-line", action: "add-element", tag: "line",
-			attributes: { x1: "100", y1: "100", x2: "400", y2: "400", fill: "none", stroke: "#ffffff", "stroke-width": "12", "stroke-linecap": "round" },
+			id: "ff-added-line",
+			action: "add-element",
+			tag: "line",
+			attributes: {
+				x1: "100",
+				y1: "100",
+				x2: "400",
+				y2: "400",
+				fill: "none",
+				stroke: "#ffffff",
+				"stroke-width": "12",
+				"stroke-linecap": "round",
+			},
 		},
 	]);
 	assert.equal(inserted.applied, 2);
 	assert.match(inserted.svgMarkup, /id="ff-added-circle"/);
 	assert.match(inserted.svgMarkup, /stroke-linecap="round"/);
-	const edited = editSvgElements(inserted.svgMarkup, [{
-		id: "ff-added-circle", action: "set-attributes",
-		attributes: { "stroke-width": "12", stroke: "#ffffff", transform: "translate(8 12) scale(1.1) rotate(4 256 256)" },
-	}]);
+	const edited = editSvgElements(inserted.svgMarkup, [
+		{
+			id: "ff-added-circle",
+			action: "set-attributes",
+			attributes: {
+				"stroke-width": "12",
+				stroke: "#ffffff",
+				transform: "translate(8 12) scale(1.1) rotate(4 256 256)",
+			},
+		},
+	]);
 	assert.match(edited.svgMarkup, /stroke-width="12"/);
-	assert.match(edited.svgMarkup, /transform="translate\(8 12\) scale\(1.1\) rotate\(4 256 256\)"/);
-	const removed = editSvgElements(edited.svgMarkup, [{ id: "ff-added-circle", action: "remove-element" }]);
+	assert.match(
+		edited.svgMarkup,
+		/transform="translate\(8 12\) scale\(1.1\) rotate\(4 256 256\)"/,
+	);
+	const removed = editSvgElements(edited.svgMarkup, [
+		{ id: "ff-added-circle", action: "remove-element" },
+	]);
 	assert.doesNotMatch(removed.svgMarkup, /ff-added-circle/);
 	assert.match(removed.svgMarkup, /ff-added-line/);
 });
 
 test("rejects unsafe tags, duplicate ids and unsafe attributes when inserting SVG primitives", () => {
 	const prepared = prepareEditableSvg(sample);
-	assert.throws(() => editSvgElements(prepared.svgMarkup, [{
-		id: "bad-tag", action: "add-element", tag: "script" as never, attributes: { d: "M0 0" },
-	}]), /Unsupported SVG element type/);
-	assert.throws(() => editSvgElements(prepared.svgMarkup, [{
-		id: prepared.elements[0].id, action: "add-element", tag: "circle", attributes: { r: "2" },
-	}]), /already exists/);
-	assert.throws(() => editSvgElements(prepared.svgMarkup, [{
-		id: "bad-color", action: "add-element", tag: "circle", attributes: { r: "2", fill: "url(https://example.com/x)" },
-	}]), /Unsafe value|Invalid fill/);
+	assert.throws(
+		() =>
+			editSvgElements(prepared.svgMarkup, [
+				{
+					id: "bad-tag",
+					action: "add-element",
+					tag: "script" as never,
+					attributes: { d: "M0 0" },
+				},
+			]),
+		/Unsupported SVG element type/,
+	);
+	assert.throws(
+		() =>
+			editSvgElements(prepared.svgMarkup, [
+				{
+					id: prepared.elements[0].id,
+					action: "add-element",
+					tag: "circle",
+					attributes: { r: "2" },
+				},
+			]),
+		/already exists/,
+	);
+	assert.throws(
+		() =>
+			editSvgElements(prepared.svgMarkup, [
+				{
+					id: "bad-color",
+					action: "add-element",
+					tag: "circle",
+					attributes: { r: "2", fill: "url(https://example.com/x)" },
+				},
+			]),
+		/Unsafe value|Invalid fill/,
+	);
 });
 
 test("quality analysis detects low contrast and strokes that disappear at launcher size", async () => {
-	const source = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect x="0" y="0" width="512" height="512" fill="#000000"/><circle cx="256" cy="256" r="100" fill="#202020"/><path d="M100 100 L412 412" fill="none" stroke="#202020" stroke-width="2"/></svg>';
+	const source =
+		'<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect x="0" y="0" width="512" height="512" fill="#000000"/><circle cx="256" cy="256" r="100" fill="#202020"/><path d="M100 100 L412 412" fill="none" stroke="#202020" stroke-width="2"/></svg>';
 	const report = await analyzeIconQuality(source);
-	assert.ok(report.findings.some((finding) => finding.code === "low-artwork-contrast"));
-	assert.ok(report.findings.some((finding) => finding.code === "thin-small-size-stroke"));
+	assert.ok(
+		report.findings.some((finding) => finding.code === "low-artwork-contrast"),
+	);
+	assert.ok(
+		report.findings.some(
+			(finding) => finding.code === "thin-small-size-stroke",
+		),
+	);
 	assert.ok((report.metrics.minimumContrastRatio ?? 99) < 3);
 	assert.ok((report.metrics.minimumStrokeWidthAt48px ?? 99) < 1);
 });
@@ -270,7 +335,9 @@ function extractLocalZipEntries(zip: Buffer): Map<string, Buffer> {
 		const extraLength = zip.readUInt16LE(offset + 28);
 		const nameStart = offset + 30;
 		const dataStart = nameStart + nameLength + extraLength;
-		const name = zip.subarray(nameStart, nameStart + nameLength).toString("utf8");
+		const name = zip
+			.subarray(nameStart, nameStart + nameLength)
+			.toString("utf8");
 		const compressed = zip.subarray(dataStart, dataStart + compressedSize);
 		const data = method === 8 ? inflateRawSync(compressed) : compressed;
 		entries.set(name, data);
@@ -280,53 +347,78 @@ function extractLocalZipEntries(zip: Buffer): Map<string, Buffer> {
 }
 
 test("flattens transparent iOS and Flutter launcher images onto the selected solid background", async () => {
-	const transparentSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><circle cx="256" cy="256" r="120" fill="#ffffff"/></svg>';
+	const transparentSvg =
+		'<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><circle cx="256" cy="256" r="120" fill="#ffffff"/></svg>';
 	const bundle = await exportIconBundle(transparentSvg, {
 		appName: "Transparent Test",
 		packageName: "com.example.transparent",
 		pngSizes: [128],
 		iosBackgroundColor: "#123456",
 	});
-	const entries = extractLocalZipEntries(Buffer.from(bundle.zipBase64, "base64"));
+	const entries = extractLocalZipEntries(
+		Buffer.from(bundle.zipBase64, "base64"),
+	);
 	for (const path of [
 		"ios/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
 		"flutter/assets/launcher_icon.png",
 	]) {
 		const image = entries.get(path);
-		assert.ok(image, path + " should be included in the export");
-		const decoded = await sharp(image!).raw().toBuffer({ resolveWithObject: true });
+		assert.ok(image, `${path} should be included in the export`);
+		const decoded = await sharp(image)
+			.raw()
+			.toBuffer({ resolveWithObject: true });
 		assert.equal(decoded.info.channels, 3);
-		assert.deepEqual(Array.from(decoded.data.subarray(0, 3)), [0x12, 0x34, 0x56]);
+		assert.deepEqual(
+			Array.from(decoded.data.subarray(0, 3)),
+			[0x12, 0x34, 0x56],
+		);
 	}
-	const config = entries.get("flutter/flutter_launcher_icons.yaml")!.toString("utf8");
+	const configFile = entries.get("flutter/flutter_launcher_icons.yaml");
+	assert.ok(configFile);
+	const config = configFile.toString("utf8");
 	assert.match(config, /adaptive_icon_background: "#123456"/);
 	assert.match(config, /background_color_ios: "#123456"/);
 });
 
 test("exports opaque iOS assets and a Flutter-ready launcher-icons bundle", async () => {
 	const bundle = await exportIconBundle(sample, {
-		appName: "Test App", packageName: "com.example.test", pngSizes: [128, 256], iosBackgroundColor: "#123456",
+		appName: "Test App",
+		packageName: "com.example.test",
+		pngSizes: [128, 256],
+		iosBackgroundColor: "#123456",
 	});
 	const zip = Buffer.from(bundle.zipBase64, "base64");
 	assert.equal(zip.readUInt32LE(0), 0x04034b50);
 	const entries = extractLocalZipEntries(zip);
-	assert.ok(entries.has("android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"));
-	assert.ok(entries.has("ios/Assets.xcassets/AppIcon.appiconset/Contents.json"));
+	assert.ok(
+		entries.has("android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"),
+	);
+	assert.ok(
+		entries.has("ios/Assets.xcassets/AppIcon.appiconset/Contents.json"),
+	);
 	assert.ok(entries.has("flutter/flutter_launcher_icons.yaml"));
 	assert.ok(entries.has("flutter/pubspec.yaml.snippet"));
 	assert.ok(entries.has("flutter/assets/adaptive_foreground.png"));
 	assert.ok(entries.has("flutter/assets/adaptive_monochrome.png"));
-	const config = entries.get("flutter/flutter_launcher_icons.yaml")!.toString("utf8");
+	const configFile = entries.get("flutter/flutter_launcher_icons.yaml");
+	assert.ok(configFile);
+	const config = configFile.toString("utf8");
 	assert.match(config, /remove_alpha_ios: true/);
 	assert.match(config, /image_path_ios_dark_transparent/);
 	assert.match(config, /image_path_ios_tinted_grayscale/);
-	const iosPng = entries.get("ios/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png");
+	const iosPng = entries.get(
+		"ios/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+	);
 	assert.ok(iosPng);
 	const iosMetadata = await sharp(iosPng).metadata();
 	assert.equal(iosMetadata.hasAlpha, false);
-	const flutterLauncher = await sharp(entries.get("flutter/assets/launcher_icon.png")!).metadata();
+	const flutterLauncherPng = entries.get("flutter/assets/launcher_icon.png");
+	assert.ok(flutterLauncherPng);
+	const flutterLauncher = await sharp(flutterLauncherPng).metadata();
 	assert.equal(flutterLauncher.hasAlpha, false);
-	const foregroundMetadata = await sharp(entries.get("flutter/assets/adaptive_foreground.png")!).metadata();
+	const foregroundPng = entries.get("flutter/assets/adaptive_foreground.png");
+	assert.ok(foregroundPng);
+	const foregroundMetadata = await sharp(foregroundPng).metadata();
 	assert.equal(foregroundMetadata.hasAlpha, true);
 	assert.ok(entries.has("manifest.json"));
 	assert.ok(bundle.fileCount > 20);
