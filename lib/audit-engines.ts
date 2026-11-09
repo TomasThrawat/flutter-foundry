@@ -121,6 +121,17 @@ const ENGINES: Engine[] = [
 		freeNotes: "CLI with default text output.",
 	},
 	{
+		id: "flutter-analyze",
+		name: "Flutter Analyze",
+		category: "Flutter/Dart static analysis",
+		license: "BSD-3-Clause",
+		repository: "https://github.com/flutter/flutter",
+		mode: "local-cli",
+		command: "flutter",
+		purpose: "Run the real Flutter analyzer against an existing local project without fetching packages or running app code.",
+		freeNotes: "Requires a local Flutter SDK and AUDIT_ALLOWED_ROOTS. Not bundled in Vercel; reports not_installed when unavailable.",
+	},
+	{
 		id: "ktlint",
 		name: "ktlint",
 		category: "Kotlin format/lint",
@@ -381,6 +392,11 @@ const RUNNERS: Record<string, Runner> = {
 		command: "detekt",
 		args: ["--input", "."],
 		description: "detekt Kotlin analysis.",
+	},
+	"flutter-analyze": {
+		command: "flutter",
+		args: ["analyze", "--no-pub"],
+		description: "Read-only Flutter/Dart static analysis using the project's existing package resolution; never runs pub get or project tests.",
 	},
 	ktlint: {
 		command: "ktlint",
@@ -742,7 +758,7 @@ function runProcess(
 	});
 }
 async function probe(command: string) {
-	const r = await runProcess(command, ["--version"], process.cwd(), 1800);
+	const r = await runProcess(command, ["--version"], process.cwd(), command === "flutter" ? 5000 : 1800);
 	if (r.spawnError)
 		return {
 			installed: false,
@@ -804,6 +820,14 @@ function outSummary(r: Proc) {
 async function execute(id: string, root: string, timeout: number) {
 	const spec = RUNNERS[id];
 	if (!spec) return { engine: id, status: "not_directly_runnable" };
+	if (id === "flutter-analyze") {
+		try {
+			if (!statSync(path.join(root, "pubspec.yaml")).isFile())
+				return { engine: id, status: "skipped", message: "No pubspec.yaml in the selected repository root." };
+		} catch {
+			return { engine: id, status: "skipped", message: "No pubspec.yaml in the selected repository root." };
+		}
+	}
 	if (id === "zizmor") {
 		try {
 			if (!statSync(path.join(root, ".github")).isDirectory())
@@ -952,6 +976,7 @@ export function registerAuditTools(register: AuditToolRegistrar) {
 					"ruff",
 					"shellcheck",
 					"biome",
+					"flutter-analyze",
 					"detekt",
 					"ktlint",
 					"golangci-lint",
@@ -977,10 +1002,9 @@ export function registerAuditTools(register: AuditToolRegistrar) {
 					error: p.error,
 					installHint: "Install the upstream CLI and add it to PATH.",
 				};
-			const timeout = Math.min(
-				20000,
-				Math.max(1000, Number(process.env.AUDIT_ENGINE_TIMEOUT_MS) || 12000),
-			);
+			const maxTimeout = engine === "flutter-analyze" ? 45000 : 20000;
+			const defaultTimeout = engine === "flutter-analyze" ? 30000 : 12000;
+			const timeout = Math.min(maxTimeout, Math.max(1000, Number(process.env.AUDIT_ENGINE_TIMEOUT_MS) || defaultTimeout));
 			return {
 				repositoryRoot: root,
 				...(await execute(engine, root, timeout)),
@@ -1007,6 +1031,7 @@ export function registerAuditTools(register: AuditToolRegistrar) {
 							"ruff",
 							"shellcheck",
 							"biome",
+							"flutter-analyze",
 							"detekt",
 							"ktlint",
 							"golangci-lint",
@@ -1014,7 +1039,7 @@ export function registerAuditTools(register: AuditToolRegistrar) {
 							"prism-scanner",
 						]),
 					)
-					.max(13)
+					.max(14)
 					.optional(),
 			})
 			.strict(),
