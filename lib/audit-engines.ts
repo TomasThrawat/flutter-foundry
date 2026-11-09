@@ -128,8 +128,10 @@ const ENGINES: Engine[] = [
 		repository: "https://github.com/flutter/flutter",
 		mode: "local-cli",
 		command: "flutter",
-		purpose: "Run the real Flutter analyzer against an existing local project without fetching packages or running app code.",
-		freeNotes: "Requires a local Flutter SDK and AUDIT_ALLOWED_ROOTS. Not bundled in Vercel; reports not_installed when unavailable.",
+		purpose:
+			"Run the real Flutter analyzer against an existing local project without fetching packages or running app code.",
+		freeNotes:
+			"Requires a local Flutter SDK and AUDIT_ALLOWED_ROOTS. Not bundled in Vercel; reports not_installed when unavailable.",
 	},
 	{
 		id: "ktlint",
@@ -396,7 +398,8 @@ const RUNNERS: Record<string, Runner> = {
 	"flutter-analyze": {
 		command: "flutter",
 		args: ["analyze", "--no-pub"],
-		description: "Read-only Flutter/Dart static analysis using the project's existing package resolution; never runs pub get or project tests.",
+		description:
+			"Read-only Flutter/Dart static analysis using the project's existing package resolution; never runs pub get or project tests.",
 	},
 	ktlint: {
 		command: "ktlint",
@@ -758,7 +761,12 @@ function runProcess(
 	});
 }
 async function probe(command: string) {
-	const r = await runProcess(command, ["--version"], process.cwd(), command === "flutter" ? 5000 : 1800);
+	const r = await runProcess(
+		command,
+		["--version"],
+		process.cwd(),
+		command === "flutter" ? 5000 : 1800,
+	);
 	if (r.spawnError)
 		return {
 			installed: false,
@@ -823,9 +831,17 @@ async function execute(id: string, root: string, timeout: number) {
 	if (id === "flutter-analyze") {
 		try {
 			if (!statSync(path.join(root, "pubspec.yaml")).isFile())
-				return { engine: id, status: "skipped", message: "No pubspec.yaml in the selected repository root." };
+				return {
+					engine: id,
+					status: "skipped",
+					message: "No pubspec.yaml in the selected repository root.",
+				};
 		} catch {
-			return { engine: id, status: "skipped", message: "No pubspec.yaml in the selected repository root." };
+			return {
+				engine: id,
+				status: "skipped",
+				message: "No pubspec.yaml in the selected repository root.",
+			};
 		}
 	}
 	if (id === "zizmor") {
@@ -1004,7 +1020,13 @@ export function registerAuditTools(register: AuditToolRegistrar) {
 				};
 			const maxTimeout = engine === "flutter-analyze" ? 45000 : 20000;
 			const defaultTimeout = engine === "flutter-analyze" ? 30000 : 12000;
-			const timeout = Math.min(maxTimeout, Math.max(1000, Number(process.env.AUDIT_ENGINE_TIMEOUT_MS) || defaultTimeout));
+			const timeout = Math.min(
+				maxTimeout,
+				Math.max(
+					1000,
+					Number(process.env.AUDIT_ENGINE_TIMEOUT_MS) || defaultTimeout,
+				),
+			);
 			return {
 				repositoryRoot: root,
 				...(await execute(engine, root, timeout)),
