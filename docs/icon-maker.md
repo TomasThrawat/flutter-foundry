@@ -9,7 +9,7 @@ Flutter Foundry exposes a unified icon workflow at /icon-maker and through the /
 - SVG element preparation with stable IDs and targeted safe edits. Only selected elements are changed; supported operations are set attributes, remove attributes and remove element.
 - Automated heuristic quality report for viewBox shape, visible artwork bounds, margins, centering, element count and approximate rendered palette size. Scores and findings are advisory.
 - SVG validation and whitespace optimization.
-- Raster import for PNG, JPEG and WebP. The conversion uses a limited-color, low-resolution rectangle trace. It is intended for flat artwork and pixel-style graphics, not photo-faithful vector tracing.
+- Raster import for PNG, JPEG and WebP. The conversion uses a limited-color, low-resolution rectangle trace and preserves quantized pixel transparency as SVG fill opacity. It is intended for flat artwork and pixel-style graphics, not photo-faithful vector tracing.
 - ZIP export with source SVG, multiple PNG sizes, Android adaptive icon resources, monochrome and foreground VectorDrawable resources, legacy density PNGs and an iOS AppIcon asset catalog.
 - Local browser undo/redo and up to 30 saved versions using localStorage.
 

@@ -345,22 +345,23 @@ export async function vectorizeRasterImage(inputBase64:string,options:{size?:num
   if((metadata.pages||1)>1)throw new Error("Animated images are not supported for vectorization.");
   const rendered=await image.rotate().resize(size,size,{fit:"contain",background:{r:0,g:0,b:0,alpha:0}}).ensureAlpha().raw().toBuffer({resolveWithObject:true});
   const data=rendered.data,info=rendered.info;
-  const keyOf=(i:number)=>[Math.round(data[i]/32)*32,Math.round(data[i+1]/32)*32,Math.round(data[i+2]/32)*32,Math.round(data[i+3]/32)*32].join(",");
+  const keyOf=(i:number)=>[Math.round(data[i]/32)*32,Math.round(data[i+1]/32)*32,Math.round(data[i+2]/32)*32].join(",");
+  const alphaOf=(i:number)=>Math.min(255,Math.round(data[i+3]/32)*32);
   const counts=new Map<string,number>();
   for(let i=0;i<data.length;i+=4)if(data[i+3]>24)counts.set(keyOf(i),(counts.get(keyOf(i))||0)+1);
   const paletteKeys=[...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,maxColors).map(([key])=>key);
   if(!paletteKeys.length)throw new Error("The imported image contains no visible pixels.");
-  const palette=paletteKeys.map((key)=>{const rgb=key.split(",").map(Number);return "#"+rgb.slice(0,3).map((v)=>Math.max(0,Math.min(255,v)).toString(16).padStart(2,"0")).join("");});
-  const mapped=new Array<number>(size*size).fill(-1);
+  const palette=paletteKeys.map((key)=>{const rgb=key.split(",").map(Number);return "#"+rgb.map((v)=>Math.max(0,Math.min(255,v)).toString(16).padStart(2,"0")).join("");});
+  const mapped=new Array<number>(size*size).fill(-1),mappedAlpha=new Array<number>(size*size).fill(0);
   for(let y=0;y<info.height;y++)for(let x=0;x<info.width;x++){
     const i=(y*info.width+x)*4;if(data[i+3]<=24)continue;
     let best=0,bestDistance=Infinity;
     for(let p=0;p<paletteKeys.length;p++){const c=paletteKeys[p].split(",").map(Number),distance=(data[i]-c[0])**2+(data[i+1]-c[1])**2+(data[i+2]-c[2])**2;if(distance<bestDistance){bestDistance=distance;best=p;}}
-    mapped[y*size+x]=best;
+    const pixelIndex=y*size+x;mapped[pixelIndex]=best;mappedAlpha[pixelIndex]=alphaOf(i);
   }
   const rects:string[]=[];
-  for(let y=0;y<size;y++){let x=0;while(x<size){const colorIndex=mapped[y*size+x];if(colorIndex<0){x++;continue;}let end=x+1;while(end<size&&mapped[y*size+end]===colorIndex)end++;rects.push('<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="'+palette[colorIndex]+'"/>');x=end;}}
+  for(let y=0;y<size;y++){let x=0;while(x<size){const pixelIndex=y*size+x,colorIndex=mapped[pixelIndex],alpha=mappedAlpha[pixelIndex];if(colorIndex<0){x++;continue;}let end=x+1;while(end<size&&mapped[y*size+end]===colorIndex&&mappedAlpha[y*size+end]===alpha)end++;const opacity=Number((alpha/255).toFixed(3));rects.push('<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="'+palette[colorIndex]+'" fill-opacity="'+opacity+'"/>');x=end;}}
   const svgMarkup='<svg xmlns="'+SVG_NS+'" width="512" height="512" viewBox="0 0 '+size+" "+size+'" shape-rendering="crispEdges">'+rects.join("")+"</svg>";
   const png=await renderIconPng(svgMarkup,512);
-  return {svgMarkup,pngBase64:png.pngBase64,palette,note:"Posterized raster-to-vector conversion at "+size+"x"+size+" with "+palette.length+" colors. Creates editable vector rectangles and works best for flat artwork or pixel-style graphics, not detailed photographs."};
+  return {svgMarkup,pngBase64:png.pngBase64,palette,note:"Posterized raster-to-vector conversion at "+size+"x"+size+" with "+palette.length+" colors. Preserves quantized pixel transparency in SVG fill opacity. Creates editable vector rectangles and works best for flat artwork or pixel-style graphics, not detailed photographs."};
 }

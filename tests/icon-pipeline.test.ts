@@ -156,3 +156,23 @@ test("vectorizes a small raster image into editable SVG rectangles and PNG previ
   assert.equal(metadata.width, 512);
   assert.equal(metadata.height, 512);
 });
+
+test("preserves partial alpha as SVG opacity and in the PNG preview", async () => {
+  const image = await sharp({
+    create: { width: 12, height: 12, channels: 4, background: { r: 240, g: 80, b: 20, alpha: 0.5 } }
+  }).composite([{
+    input: { create: { width: 6, height: 12, channels: 4, background: { r: 240, g: 80, b: 20, alpha: 1 } } },
+    left: 3,
+    top: 0
+  }]).png().toBuffer();
+
+  const converted = await vectorizeRasterImage(image.toString("base64"), { size: 24, colors: 4 });
+  assert.equal(converted.palette.length, 1, "alpha levels must not be counted as separate RGB colors");
+  assert.match(converted.svgMarkup, /fill-opacity="0\.502"/);
+  assert.match(converted.svgMarkup, /fill-opacity="1"/);
+
+  const preview = await sharp(Buffer.from(converted.pngBase64, "base64")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const alphaAt = (x: number, y: number) => preview.data[(y * preview.info.width + x) * 4 + 3];
+  assert.ok(alphaAt(40, 256) > 0 && alphaAt(40, 256) < 255, "semi-transparent pixels must remain translucent");
+  assert.equal(alphaAt(256, 256), 255, "opaque pixels must remain opaque");
+});
