@@ -26,3 +26,12 @@ bash .github/scripts/security-scan.sh
 Review findings and fix them rather than adding broad ignores. Each scanner and rule pack remains subject to its upstream license and terms.
 
 **Deployment note:** the scanner gate blocks test/build jobs in the GitHub Actions workflow. It does not independently block a separate Vercel deployment unless deployment policy requires the relevant CI check.
+
+
+## Public API request boundaries
+
+- The icon pipeline caps JSON request bodies at 9 MiB to accommodate the bounded raster-import payload; the browser SVG-Edit endpoint caps them at 300 KiB.
+
+- The two expensive icon endpoints apply a best-effort per-process rate limit keyed from proxy client-address headers when present. Serverless instances do not share this memory, and requests without an address header cannot be bucketed. This is an abuse backstop, not a global rate limiter or an authentication boundary; use gateway/provider limits for production.
+
+- Optional ICON_API_TOKEN protection remains available for deployments that choose authenticated browser processing. The endpoints remain no-auth when the variable is unset.

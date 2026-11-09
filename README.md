@@ -13,9 +13,10 @@ A fresh open-source Flutter engineering MCP server built around live official da
 - Live pub.dev search and package metadata.
 - Official Flutter/Dart references and stack recommendations.
 - GitHub Actions workflow generation.
-- Flutter/Dart/Gradle build-log triage and repair planning.
+- Flutter/Dart/Gradle build-log triage with first-cause hints and repair planning.
+- Optional real Flutter analyzer through a fixed local CLI adapter inside AUDIT_ALLOWED_ROOTS; it requires a locally installed Flutter SDK and is not bundled in Vercel.
 - ARB localization key/placeholder checks and LCOV coverage summaries.
-- Heuristic Android manifest/Gradle and Flutter accessibility checks.
+- Heuristic Android manifest/Gradle and Flutter accessibility checks, including exported-component permission review and ARB locale direction/mismatch reporting.
 - OSV scans for exact dependency versions.
 - SDK/dependency-context review and release-report triage.
 
@@ -58,7 +59,7 @@ The SVG-Edit integration test contacts the official hosted editor and requires o
 3. Set ICON_API_TOKEN to protect the browser-heavy /api/icons/edit endpoint.
 4. Keep SVG_EDIT_URL at its official default unless you intentionally configure a trusted compatible build.
 
-The Playwright call can take tens of seconds because it starts Chromium and loads a remote editor. Verify serverless duration and memory limits on the selected plan.
+The Playwright call can take tens of seconds because it starts Chromium and loads a remote editor. Verify serverless duration and memory limits on the selected plan. Public icon endpoints enforce request-body caps and a best-effort in-memory per-instance throttle; this is not a global rate limiter. Configure provider-level limits for production traffic.
 
 ## Security notes
 
@@ -72,3 +73,8 @@ Static findings are advisory. The tools do not claim a Flutter build or device t
 - A standalone Superpowers-only MCP endpoint is available at /api/superpowers-mcp.
 - Tools: list skills, load a skill, read a supporting file, search skill summaries, compose a workflow, and validate workflow guardrails.
 - Source is pinned to an immutable upstream Superpowers v7.0.1 commit. Skill files are fetched read-only, with path checks and request timeouts. See docs/superpowers-mcp.md.
+
+
+### Flutter analysis
+
+When a local machine or MCP host has the Flutter SDK installed, flutter-analyze runs the fixed, read-only command flutter analyze --no-pub. The target must be within AUDIT_ALLOWED_ROOTS and contain pubspec.yaml. The hosted Vercel deployment does not include the Flutter SDK; there the engine reports not_installed and build-log triage remains available.
