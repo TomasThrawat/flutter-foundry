@@ -58,7 +58,6 @@ test("rejects invalid prompt, dimensions, and colors", () => {
 	);
 });
 
-
 test("recognizes send, trash and phone icons in English and Arabic", () => {
 	const cases = [
 		{ prompt: "minimal send paper plane icon", concept: "send" },
@@ -69,7 +68,10 @@ test("recognizes send, trash and phone icons in English and Arabic", () => {
 		{ prompt: "أيقونة هاتف للاتصال", concept: "phone" },
 	];
 	for (const item of cases) {
-		const generated = generateIconFromPrompt({ prompt: item.prompt, style: "minimal" });
+		const generated = generateIconFromPrompt({
+			prompt: item.prompt,
+			style: "minimal",
+		});
 		assert.equal(generated.concept, item.concept, item.prompt);
 		assert.match(sanitizeSvgInput(generated.svgMarkup), /^<svg/);
 		assert.match(generated.svgMarkup, /<path|<rect/);
