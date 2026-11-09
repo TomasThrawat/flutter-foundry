@@ -46,7 +46,9 @@ export async function readJsonBodyLimited<T extends Record<string, unknown>>(
 		bytes.set(chunk, offset);
 		offset += chunk.byteLength;
 	}
-	const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+	const parsed: unknown = JSON.parse(
+		new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+	);
 	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
 		throw new Error("Request body must be a JSON object.");
 	return parsed as T;
@@ -62,10 +64,17 @@ export function bestEffortRateLimit(
 	limit: number,
 	windowMs: number,
 ): Response | null {
-	if (!Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(windowMs) || windowMs < 1)
+	if (
+		!Number.isSafeInteger(limit) ||
+		limit < 1 ||
+		!Number.isSafeInteger(windowMs) ||
+		windowMs < 1
+	)
 		throw new Error("Rate-limit values must be positive integers.");
 	const forwarded = request.headers.get("x-forwarded-for");
-	const address = forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip")?.trim();
+	const address =
+		forwarded?.split(",")[0]?.trim() ||
+		request.headers.get("x-real-ip")?.trim();
 	if (!address) return null;
 	const key = routeKey + ":" + address;
 	const now = Date.now();
@@ -78,7 +87,13 @@ export function bestEffortRateLimit(
 		const retryAfter = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
 		return Response.json(
 			{ error: "Too many requests. Try again after the retry interval." },
-			{ status: 429, headers: { "Retry-After": String(retryAfter), "Cache-Control": "no-store" } },
+			{
+				status: 429,
+				headers: {
+					"Retry-After": String(retryAfter),
+					"Cache-Control": "no-store",
+				},
+			},
 		);
 	}
 	bucket.count += 1;
