@@ -88,10 +88,18 @@ export function sanitizeSvgInput(svg: string): string {
   return clean;
 }
 
-function allowedEditorUrl(): string {
-  const url = process.env.SVG_EDIT_URL?.trim() || DEFAULT_EDITOR_URL;
-  const parsed = new URL(url);
+export function resolveSvgEditorUrl(value?: string): string {
+  const url = value?.trim() || DEFAULT_EDITOR_URL;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("SVG_EDIT_URL must be a valid URL.");
+  }
   if (parsed.protocol !== "https:") throw new Error("SVG_EDIT_URL must use HTTPS.");
+  if (parsed.username || parsed.password || parsed.port) {
+    throw new Error("SVG_EDIT_URL must not contain credentials or a custom port.");
+  }
   if (!new Set(["svgedit.netlify.app", "unpkg.com"]).has(parsed.hostname)) {
     throw new Error("SVG_EDIT_URL must point to the official SVG-Edit Netlify app or unpkg distribution.");
   }
@@ -109,11 +117,14 @@ async function launchBrowser(): Promise<Browser> {
   return playwrightChromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 }
 
-export async function runSvgEdit(svgInput: string): Promise<SvgEditResult> {
+export async function runSvgEdit(
+  svgInput: string,
+  browserFactory: () => Promise<Browser> = launchBrowser
+): Promise<SvgEditResult> {
   const svg = sanitizeSvgInput(svgInput);
-  const editorUrl = allowedEditorUrl();
+  const editorUrl = resolveSvgEditorUrl(process.env.SVG_EDIT_URL);
   const started = Date.now();
-  const browser = await launchBrowser();
+  const browser = await browserFactory();
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
     page.setDefaultTimeout(30_000);
