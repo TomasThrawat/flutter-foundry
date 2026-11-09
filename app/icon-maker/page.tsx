@@ -608,18 +608,42 @@ export default function IconMakerPage() {
 						))}
 					</div>
 					{png && (
-						<div style={{ display: "flex", alignItems: "end", gap: 18, flexWrap: "wrap", marginBottom: 18 }}>
+						<div
+							style={{
+								display: "flex",
+								alignItems: "end",
+								gap: 18,
+								flexWrap: "wrap",
+								marginBottom: 18,
+							}}
+						>
 							<strong className="small">Small-size legibility</strong>
 							{[32, 48, 64].map((previewSize) => (
-								<div key={previewSize} style={{ display: "grid", justifyItems: "center", gap: 6 }}>
-									<div style={{ width: previewSize, height: previewSize, overflow: "hidden", borderRadius: "22%", background: "#000", border: "1px solid #555" }}>
+								<div
+									key={previewSize}
+									style={{ display: "grid", justifyItems: "center", gap: 6 }}
+								>
+									<div
+										style={{
+											width: previewSize,
+											height: previewSize,
+											overflow: "hidden",
+											borderRadius: "22%",
+											background: "#000",
+											border: "1px solid #555",
+										}}
+									>
 										<Image
 											alt={previewSize + " pixel icon preview"}
 											src={"data:image/png;base64," + png}
 											width={previewSize}
 											height={previewSize}
 											unoptimized
-											style={{ width: "100%", height: "100%", objectFit: "contain" }}
+											style={{
+												width: "100%",
+												height: "100%",
+												objectFit: "contain",
+											}}
 										/>
 									</div>
 									<span className="small">{previewSize}px</span>
