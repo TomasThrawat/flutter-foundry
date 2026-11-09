@@ -40,6 +40,8 @@ jobs:
     steps:
       - name: Validate target repository and ref
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [[ ! "$TARGET_REPOSITORY" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$ ]] || [[ "$TARGET_REPOSITORY" == *".."* ]]; then
@@ -51,10 +53,15 @@ jobs:
             exit 1
           fi
           case "$FLUTTER_CHANNEL" in stable|beta|main) ;; *) echo "Invalid Flutter channel."; exit 1 ;; esac
-          metadata="$(curl --fail --silent --show-error "https://api.github.com/repos/$TARGET_REPOSITORY")"
-          visibility="$(jq -r '.visibility // empty' <<< "$metadata")"
+          metadata="$(curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$TARGET_REPOSITORY")"
+          is_private="$(jq -r '.private // true' <<< "$metadata")"
           archived="$(jq -r '.archived // true' <<< "$metadata")"
-          if [[ "$visibility" != "public" || "$archived" != "false" ]]; then
+          echo "Target repository check: private=$is_private archived=$archived"
+          if [[ "$is_private" != "false" || "$archived" != "false" ]]; then
             echo "Only active public repositories can be built."
             exit 1
           fi
