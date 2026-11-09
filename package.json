@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:svg-edit": "playwright test tests/svg-edit.integration.spec.ts",
-    "test:icons": "tsx --test tests/icon-pipeline.test.ts tests/icon-generator.test.ts tests/icon-png.test.ts"
+    "test:icons": "tsx --test tests/icon-pipeline.test.ts tests/icon-generator.test.ts tests/icon-png.test.ts tests/svg-sanitize.test.ts",
+    "test:icons:coverage": "node --experimental-test-coverage --test-coverage-include=lib/icon-*.ts --test-coverage-include=lib/svg-edit.ts --import=tsx --test tests/icon-pipeline.test.ts tests/icon-generator.test.ts tests/icon-png.test.ts tests/svg-sanitize.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
@@ -53,5 +54,8 @@
     "eslint": {
       "minimatch": "^11.0.1"
     }
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }

@@ -66,6 +66,57 @@ test("quality analysis reports dimensions, element count and artwork metrics", a
   assert.ok(Array.isArray(report.findings));
 });
 
+test("quality analysis measures visible artwork on a transparent canvas", async () => {
+  const transparentSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><circle cx="256" cy="256" r="120" fill="#ffffff"/></svg>';
+  const report = await analyzeIconQuality(transparentSvg);
+  assert.ok(!report.findings.some((finding) => finding.code === "no-visible-artwork"));
+  assert.ok(report.metrics.artworkWidth > 0);
+  assert.ok(report.metrics.artworkHeight > 0);
+  assert.ok(report.metrics.artworkCoverage > 0.12);
+  assert.ok(report.metrics.artworkCoverage < 0.78);
+});
+
+test("quality analysis samples an opaque canvas background from the border", async () => {
+  const report = await analyzeIconQuality(sample);
+  assert.ok(!report.findings.some((finding) => finding.code === "no-visible-artwork"));
+  assert.ok(report.metrics.artworkCoverage > 0.12);
+  assert.ok(report.metrics.artworkCoverage < 0.78);
+});
+
+test("quality analysis reports a fully transparent canvas with no visible artwork", async () => {
+  const emptySvg = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"></svg>';
+  const report = await analyzeIconQuality(emptySvg);
+  assert.ok(report.findings.some((finding) => finding.code === "no-visible-artwork"));
+  assert.equal(report.metrics.artworkWidth, 0);
+  assert.equal(report.metrics.artworkHeight, 0);
+});
+
+test("rejects duplicate IDs across editable and non-editable SVG elements", () => {
+  const duplicate = '<svg xmlns="http://www.w3.org/2000/svg" id="root"><defs id="shared"></defs><path id="shared" d="M10 10 H20 V20 Z"/></svg>';
+  assert.throws(() => prepareEditableSvg(duplicate), /duplicate element id: shared/);
+});
+
+test("generated SVG element IDs skip IDs already used by non-editable elements", () => {
+  const source = '<svg xmlns="http://www.w3.org/2000/svg"><defs id="ff-element-1"></defs><path d="M10 10 H20 V20 Z"/></svg>';
+  const prepared = prepareEditableSvg(source);
+  assert.equal(prepared.elements[0].id, "ff-element-2");
+});
+
+test("rejects malformed targeted edits instead of treating unknown actions as deletion", () => {
+  const prepared = prepareEditableSvg(sample);
+  const target = prepared.elements[0];
+  assert.throws(() => editSvgElements(prepared.svgMarkup, [null as never]), /valid element id/);
+  assert.throws(() => editSvgElements(prepared.svgMarkup, [{
+    id: target.id, action: "remove-attributes", attributes: undefined
+  } as never]), /Choose 1 to 12 attributes/);
+  assert.throws(() => editSvgElements(prepared.svgMarkup, [{
+    id: target.id, action: "set-attributes", attributes: []
+  } as never]), /1 to 12 attributes/);
+  assert.throws(() => editSvgElements(prepared.svgMarkup, [{
+    id: target.id, action: "replace-element"
+  } as never]), /Unsupported SVG edit action/);
+});
+
 test("SVG optimization removes inter-tag whitespace while preserving geometry", () => {
   const source = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"> \n <circle cx="256" cy="256" r="120" fill="#fff"/> \n </svg>';
   const optimized = optimizeSvg(source);

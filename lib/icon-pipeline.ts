@@ -38,13 +38,20 @@ function serialize(root:XmlElement):string{return new XMLSerializer().serializeT
 
 export type ElementSummary={id:string;tag:string;fill:string|null;stroke:string|null;label:string};
 export function prepareEditableSvg(svgMarkup:string):{svgMarkup:string;elements:ElementSummary[]} {
-  const parsed=parseSvg(svgMarkup), root=parsed.root; let next=1; const used=new Set<string>(), summaries:ElementSummary[]=[];
-  for(const element of allElements(root).slice(1)) {
-    const tag=element.localName||element.nodeName; if(!EDITABLE_TAGS.has(tag)) continue;
-    let id=(element.getAttribute("id")||"").trim();
-    if(id&&used.has(id)) throw new Error("SVG contains a duplicate element id: "+id+".");
-    if(!id){do{id="ff-element-"+next++;}while(used.has(id));element.setAttribute("id",id);}
+  const parsed=parseSvg(svgMarkup),root=parsed.root,elements=allElements(root);
+  const used=new Set<string>();
+  for(const element of elements) {
+    const id=element.getAttribute("id")||"";
+    if(!id) continue;
+    if(id.length>128||id!==id.trim()||/\s/.test(id)) throw new Error("SVG contains an invalid element id.");
+    if(used.has(id)) throw new Error("SVG contains a duplicate element id: "+id+".");
     used.add(id);
+  }
+  let next=1; const summaries:ElementSummary[]=[];
+  for(const element of elements.slice(1)) {
+    const tag=element.localName||element.nodeName; if(!EDITABLE_TAGS.has(tag)) continue;
+    let id=element.getAttribute("id")||"";
+    if(!id){do{id="ff-element-"+next++;}while(used.has(id));element.setAttribute("id",id);used.add(id);}
     summaries.push({id,tag,fill:element.getAttribute("fill")||null,stroke:element.getAttribute("stroke")||null,label:tag+" · "+id});
   }
   return {svgMarkup:serialize(root),elements:summaries};
@@ -77,20 +84,23 @@ export function editSvgElements(svgMarkup:string,operations:SvgElementOperation[
   if(!Array.isArray(operations)||operations.length<1||operations.length>20)throw new Error("Provide between 1 and 20 targeted SVG element operations.");
   const root=parseSvg(svgMarkup).root; let applied=0;
   for(const operation of operations) {
-    if(!operation.id||operation.id.length>128)throw new Error("Each targeted edit requires a valid element id.");
+    if(!operation||typeof operation!=="object"||typeof operation.id!=="string"||!operation.id.trim()||operation.id.length>128)throw new Error("Each targeted edit requires a valid element id.");
     const target=allElements(root).find((element)=>element.getAttribute?.("id")===operation.id);
     if(!target||target===root)throw new Error("SVG element not found or not editable: "+operation.id+".");
     const tag=target.localName||target.nodeName; if(!EDITABLE_TAGS.has(tag))throw new Error("Element "+operation.id+" is not an editable graphic element.");
     if(operation.action==="set-attributes") {
-      const entries=Object.entries(operation.attributes||{});
+      if(!operation.attributes||typeof operation.attributes!=="object"||Array.isArray(operation.attributes))throw new Error("A set operation must contain 1 to 12 attributes.");
+      const entries=Object.entries(operation.attributes);
       if(!entries.length||entries.length>12)throw new Error("A set operation must contain 1 to 12 attributes.");
       for(const [name,value] of entries){if(!EDITABLE_ATTRIBUTES.has(name))throw new Error("Attribute is not editable: "+name+".");validateAttributeValue(name,value);target.setAttribute(name,value);}
     } else if(operation.action==="remove-attributes") {
-      if(!operation.attributes.length||operation.attributes.length>12)throw new Error("Choose 1 to 12 attributes to remove.");
-      for(const name of operation.attributes){if(!EDITABLE_ATTRIBUTES.has(name))throw new Error("Attribute is not editable: "+name+".");target.removeAttribute(name);}
-    } else {
+      if(!Array.isArray(operation.attributes)||!operation.attributes.length||operation.attributes.length>12)throw new Error("Choose 1 to 12 attributes to remove.");
+      for(const name of operation.attributes){if(typeof name!=="string"||!EDITABLE_ATTRIBUTES.has(name))throw new Error("Attribute is not editable: "+String(name)+".");target.removeAttribute(name);}
+    } else if(operation.action==="remove-element") {
       if(!target.parentNode)throw new Error("The selected element cannot be removed.");
       target.parentNode.removeChild(target);
+    } else {
+      throw new Error("Unsupported SVG edit action.");
     }
     applied++;
   }
@@ -112,28 +122,52 @@ export async function analyzeIconQuality(svgMarkup:string):Promise<IconQualityRe
   if(viewBox.length!==4||viewBox.some((value:number)=>!Number.isFinite(value))||viewBox[2]<=0||viewBox[3]<=0)throw new Error("SVG viewBox must contain four valid positive dimensions.");
   const vw=viewBox[2],vh=viewBox[3];
   const rendered=await sharp(Buffer.from(prepared.svgMarkup)).resize(256,256,{fit:"contain",background:{r:0,g:0,b:0,alpha:0}}).ensureAlpha().raw().toBuffer({resolveWithObject:true});
-  const data=rendered.data,info=rendered.info,counts=new Map<string,number>();
-  for(let i=0;i<data.length;i+=4){if(data[i+3]<12)continue;const key=data[i]+","+data[i+1]+","+data[i+2];counts.set(key,(counts.get(key)||0)+1);}
-  const dominant=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||"",background=dominant?dominant.split(",").map(Number):[];
+  const data=rendered.data,info=rendered.info;
+  const paletteCounts=new Map<string,number>();
+  const borderCounts=new Map<string,{count:number;red:number;green:number;blue:number}>();
+  const alphaThreshold=12,borderPixelCount=Math.max(1,2*info.width+2*info.height-4);
+  let visibleBorderPixels=0;
+  for(let y=0;y<info.height;y++)for(let x=0;x<info.width;x++){
+    const i=(y*info.width+x)*4;
+    if(data[i+3]<alphaThreshold)continue;
+    const red=data[i],green=data[i+1],blue=data[i+2];
+    const paletteKey=(red>>4)+","+(green>>4)+","+(blue>>4);
+    paletteCounts.set(paletteKey,(paletteCounts.get(paletteKey)||0)+1);
+    if(x===0||y===0||x===info.width-1||y===info.height-1){
+      visibleBorderPixels++;
+      const bin=borderCounts.get(paletteKey);
+      if(bin){bin.count++;bin.red+=red;bin.green+=green;bin.blue+=blue;}
+      else borderCounts.set(paletteKey,{count:1,red,green,blue});
+    }
+  }
+  let dominantBorder:{count:number;red:number;green:number;blue:number}|null=null;
+  for(const bin of borderCounts.values())if(!dominantBorder||bin.count>dominantBorder.count)dominantBorder=bin;
+  const background=dominantBorder?{
+    red:dominantBorder.red/dominantBorder.count,
+    green:dominantBorder.green/dominantBorder.count,
+    blue:dominantBorder.blue/dominantBorder.count
+  }:null;
+  const transparentBackground=visibleBorderPixels<borderPixelCount;
   let minX=info.width,minY=info.height,maxX=-1,maxY=-1;
   for(let y=0;y<info.height;y++)for(let x=0;x<info.width;x++){
-    const i=(y*info.width+x)*4;if(data[i+3]<12)continue;
-    const different=!dominant||Math.abs(data[i]-background[0])+Math.abs(data[i+1]-background[1])+Math.abs(data[i+2]-background[2])>45;
+    const i=(y*info.width+x)*4;if(data[i+3]<alphaThreshold)continue;
+    const different=transparentBackground||!background||
+      Math.abs(data[i]-background.red)+Math.abs(data[i+1]-background.green)+Math.abs(data[i+2]-background.blue)>45;
     if(different){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
   }
   const hasForeground=maxX>=minX&&maxY>=minY,artW=hasForeground?maxX-minX+1:0,artH=hasForeground?maxY-minY+1:0;
   const coverage=hasForeground?(artW*artH)/(info.width*info.height):0;
   const centerX=hasForeground?Math.abs(((minX+maxX)/2)-info.width/2)/info.width:0;
   const centerY=hasForeground?Math.abs(((minY+maxY)/2)-info.height/2)/info.height:0;
-  const elementCount=allElements(root).length-1,colors=counts.size,findings:IconQualityFinding[]=[];
+  const elementCount=allElements(root).length-1,colors=paletteCounts.size,findings:IconQualityFinding[]=[];
   if(Math.abs(vw-vh)/Math.max(vw,vh)>0.02)findings.push({severity:"warning",code:"non-square-viewbox",message:"The SVG viewBox is not square.",recommendation:"Use a square canvas for consistent app-icon rendering."});
-  if(!hasForeground)findings.push({severity:"warning",code:"no-visible-artwork",message:"No distinct artwork was detected against the dominant canvas color.",recommendation:"Check foreground/background colors and confirm the icon is visible."});
+  if(!hasForeground)findings.push({severity:"warning",code:"no-visible-artwork",message:"No distinct artwork was detected against the estimated canvas background.",recommendation:"Check foreground/background colors and confirm the icon is visible."});
   if(hasForeground&&coverage<0.12)findings.push({severity:"warning",code:"small-artwork",message:"The artwork occupies a small part of the canvas.",recommendation:"Increase artwork size while keeping a clear launcher safe margin."});
   if(hasForeground&&coverage>0.78)findings.push({severity:"warning",code:"tight-safe-area",message:"The artwork nearly fills the canvas.",recommendation:"Add outer padding so launcher masks do not crop important details."});
   if(hasForeground&&(centerX>0.07||centerY>0.07))findings.push({severity:"warning",code:"off-center",message:"The detected artwork is noticeably off-center.",recommendation:"Reposition the artwork closer to the canvas center."});
   if(hasForeground&&(minX<5||minY<5||maxX>info.width-6||maxY>info.height-6))findings.push({severity:"warning",code:"edge-cropping-risk",message:"Artwork touches the canvas edge.",recommendation:"Increase safe padding to prevent clipping in circle and squircle masks."});
   if(elementCount>250)findings.push({severity:"warning",code:"complex-svg",message:"The SVG contains "+elementCount+" elements.",recommendation:"Simplify repeated geometry before shipping the icon."});
-  if(colors>24)findings.push({severity:"info",code:"large-palette",message:"The preview contains approximately "+colors+" distinct pixel colors.",recommendation:"Reduce unnecessary color variation if a simpler icon style is intended."});
+  if(colors>24)findings.push({severity:"info",code:"large-palette",message:"The preview contains approximately "+colors+" quantized color groups.",recommendation:"Reduce unnecessary color variation if a simpler icon style is intended."});
   if(!findings.length)findings.push({severity:"info",code:"balanced",message:"No obvious layout or complexity issues were detected.",recommendation:"Review the icon at launcher size and inside the target app before release."});
   const score=Math.max(0,100-findings.reduce((sum,f)=>sum+(f.severity==="warning"?14:3),0));
   return {score,dimensions:{viewBoxWidth:vw,viewBoxHeight:vh,aspectRatio:Number((vw/vh).toFixed(4)),renderedWidth:info.width,renderedHeight:info.height},

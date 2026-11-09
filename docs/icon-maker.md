@@ -34,12 +34,13 @@ The Android VectorDrawable exporter supports SVG paths, rectangles, circles, ell
 
 ## Quality and preview limitations
 
-The quality score is based on heuristic raster measurements. The dominant rendered color is treated as the estimated canvas background when calculating artwork bounds; complex gradients and multicolor full-bleed artwork can make this approximation less useful. Always review the PNG at real launcher size and test Android adaptive masks or iOS assets in the target platform.
+The quality score is based on heuristic raster measurements. Transparent canvases are measured from visible pixels; opaque canvases estimate the background from the rendered border rather than the most frequent color across the whole image. Complex gradients, textured borders and multicolor full-bleed artwork can still make this estimate less useful. Always review the PNG at real launcher size and test Android adaptive masks or iOS assets in the target platform.
 
 ## Validation
 
     npm run typecheck
     npm test
+    npm run test:icons:coverage
     npm run lint
     npm run build
     npm run test:svg-edit

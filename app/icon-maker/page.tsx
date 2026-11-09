@@ -128,6 +128,7 @@ export default function IconMakerPage() {
     const version = history[index];
     if (!version) return;
     setSelectedHistoryIndex(index);
+    setSelectedElement("");
     setSvg(version.svg);
     setPng("");
     setQuality(null);
@@ -147,6 +148,7 @@ export default function IconMakerPage() {
     return runTask("Generating SVG and PNG", async () => {
       const data = await requestPipeline("generate", { prompt, style, size, backgroundColor, foregroundColor, accentColor });
       saveVersion(data.svgMarkup, "Generated " + style);
+      setSelectedElement("");
       setPng(data.pngBase64);
       setQuality(data.quality);
       setElements(data.elements || []);
@@ -165,6 +167,7 @@ export default function IconMakerPage() {
 
   function selectVariant(variant: Variant) {
     saveVersion(variant.svgMarkup, "Variant " + variant.style);
+    setSelectedElement("");
     setPng(variant.pngBase64);
     setQuality(variant.quality);
     setElements([]);
@@ -175,6 +178,7 @@ export default function IconMakerPage() {
     return runTask("Analyzing and optimizing SVG", async () => {
       const data = await requestPipeline("analyze", { svgMarkup: svg });
       setSvg(data.svgMarkup);
+      setSelectedElement("");
       setQuality(data.quality);
       setElements(data.elements || []);
       setPng(data.pngBase64);
@@ -212,6 +216,7 @@ export default function IconMakerPage() {
       });
       const data = await requestPipeline("vectorize", { imageBase64, size: 48, colors: 6 });
       saveVersion(data.svgMarkup, "Imported and vectorized image");
+      setSelectedElement("");
       setPng(data.pngBase64);
       setQuality(data.quality);
       setElements(data.elements || []);
@@ -231,6 +236,7 @@ export default function IconMakerPage() {
       if (!response.ok) throw new Error(data.error || "SVG-Edit processing failed.");
       const analysis = await requestPipeline("analyze", { svgMarkup: data.svg });
       saveVersion(analysis.svgMarkup, "SVG-Edit round trip");
+      setSelectedElement("");
       setPng(data.previewPngBase64);
       setQuality(analysis.quality);
       setElements(analysis.elements || []);
@@ -354,7 +360,7 @@ export default function IconMakerPage() {
             <button className="button" disabled={!canRedo || busy} onClick={redo}>Redo</button>
             <button className="button" disabled={busy} onClick={editInSvgEdit}>Open in SVG-Edit</button>
             <button className="button" onClick={() => saveVersion(svg, "Manual checkpoint")}>Save version</button>
-            <button className="button" onClick={() => { setSvg(sample); setPng(""); setQuality(null); setElements([]); saveVersion(sample, "Reset sample"); }}>Reset sample</button>
+            <button className="button" onClick={() => { setSvg(sample); setSelectedElement(""); setPng(""); setQuality(null); setElements([]); saveVersion(sample, "Reset sample"); }}>Reset sample</button>
           </div>
           <div className="field" style={{ marginTop: 14 }}>
             <label htmlFor="versions">Saved versions (this browser)</label>

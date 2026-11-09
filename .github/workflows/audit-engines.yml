@@ -24,12 +24,16 @@ on:
 
 permissions:
   contents: read
+env:
+  GIT_CONFIG_COUNT: 1
+  GIT_CONFIG_KEY_0: init.defaultBranch
+  GIT_CONFIG_VALUE_0: main
 concurrency:
   group: audit-${{ github.event.pull_request.number || inputs.target_repository || github.repository }}
   cancel-in-progress: false
 jobs:
   scan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
