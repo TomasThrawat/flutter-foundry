@@ -202,7 +202,13 @@ export function prepareEditableSvg(svgMarkup: string): {
 export type SvgElementOperation =
 	| { id: string; action: "set-attributes"; attributes: Record<string, string> }
 	| { id: string; action: "remove-attributes"; attributes: string[] }
-	| { id: string; action: "remove-element" };
+	| { id: string; action: "remove-element" }
+	| {
+			id: string;
+			action: "add-element";
+			tag: "path" | "rect" | "circle" | "ellipse" | "line" | "polygon" | "polyline";
+			attributes: Record<string, string>;
+	  };
 
 function validateAttributeValue(name: string, value: string): void {
 	if (typeof value !== "string" || value.length > 4000)
@@ -239,13 +245,16 @@ function validateAttributeValue(name: string, value: string): void {
 			throw new Error("Unsupported transform syntax.");
 		return;
 	}
-	if (name === "stroke-linecap" && !["butt", "round", "square"].includes(value))
-		throw new Error("Invalid stroke-linecap.");
-	if (
-		name === "stroke-linejoin" &&
-		!["miter", "round", "bevel"].includes(value)
-	)
-		throw new Error("Invalid stroke-linejoin.");
+	if (name === "stroke-linecap") {
+		if (!["butt", "round", "square"].includes(value))
+			throw new Error("Invalid stroke-linecap.");
+		return;
+	}
+	if (name === "stroke-linejoin") {
+		if (!["miter", "round", "bevel"].includes(value))
+			throw new Error("Invalid stroke-linejoin.");
+		return;
+	}
 	if (!/^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?(?:px|%)?$/i.test(value))
 		throw new Error("Invalid numeric value for " + name + ".");
 	const numeric = Number.parseFloat(value);
@@ -267,7 +276,8 @@ export function editSvgElements(
 		throw new Error(
 			"Provide between 1 and 20 targeted SVG element operations.",
 		);
-	const root = parseSvg(svgMarkup).root;
+	const parsed = parseSvg(svgMarkup);
+	const root = parsed.root;
 	let applied = 0;
 	for (const operation of operations) {
 		if (
@@ -278,6 +288,37 @@ export function editSvgElements(
 			operation.id.length > 128
 		)
 			throw new Error("Each targeted edit requires a valid element id.");
+		if (operation.action === "add-element") {
+			const allowedTags = new Set([
+				"path", "rect", "circle", "ellipse", "line", "polygon", "polyline",
+			]);
+			if (!allowedTags.has(operation.tag))
+				throw new Error("Unsupported SVG element type for insertion.");
+			if (!/^[A-Za-z_][\w:.-]{0,127}$/.test(operation.id))
+				throw new Error("New SVG element id is invalid.");
+			if (allElements(root).some((element) => element.getAttribute("id") === operation.id))
+				throw new Error("SVG element id already exists: " + operation.id + ".");
+			if (
+				!operation.attributes ||
+				typeof operation.attributes !== "object" ||
+				Array.isArray(operation.attributes)
+			)
+				throw new Error("A new element must contain 1 to 12 safe attributes.");
+			const entries = Object.entries(operation.attributes);
+			if (!entries.length || entries.length > 12)
+				throw new Error("A new element must contain 1 to 12 safe attributes.");
+			const element = parsed.doc.createElementNS(SVG_NS, operation.tag);
+			element.setAttribute("id", operation.id);
+			for (const [name, value] of entries) {
+				if (!EDITABLE_ATTRIBUTES.has(name))
+					throw new Error("Attribute is not editable: " + name + ".");
+				validateAttributeValue(name, value);
+				element.setAttribute(name, value);
+			}
+			root.appendChild(element);
+			applied++;
+			continue;
+		}
 		const target = allElements(root).find(
 			(element) => element.getAttribute?.("id") === operation.id,
 		);
@@ -358,10 +399,47 @@ export type IconQualityReport = {
 		artworkCoverage: number;
 		horizontalCenterOffset: number;
 		verticalCenterOffset: number;
+		minimumStrokeWidthAt48px: number | null;
+		minimumContrastRatio: number | null;
 	};
 	findings: IconQualityFinding[];
 	elements: ElementSummary[];
 };
+function parseQualityColor(value: string): { red: number; green: number; blue: number } | null {
+	const normalized = COLOR_NAMES[value.trim().toLowerCase()] || value.trim();
+	let hex = normalized;
+	if (/^#[0-9a-f]{3}$/i.test(hex))
+		hex = "#" + hex.slice(1).split("").map((part) => part + part).join("");
+	if (/^#[0-9a-f]{4}$/i.test(hex)) {
+		if (hex[4].toLowerCase() !== "f") return null;
+		hex = "#" + hex.slice(1, 4).split("").map((part) => part + part).join("");
+	}
+	if (/^#[0-9a-f]{8}$/i.test(hex)) {
+		if (hex.slice(7, 9).toLowerCase() !== "ff") return null;
+		hex = hex.slice(0, 7);
+	}
+	if (!/^#[0-9a-f]{6}$/i.test(hex)) return null;
+	return {
+		red: Number.parseInt(hex.slice(1, 3), 16),
+		green: Number.parseInt(hex.slice(3, 5), 16),
+		blue: Number.parseInt(hex.slice(5, 7), 16),
+	};
+}
+function relativeLuminance(color: { red: number; green: number; blue: number }): number {
+	const linear = [color.red, color.green, color.blue].map((channel) => {
+		const value = channel / 255;
+		return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+	});
+	return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+function contrastRatio(
+	first: { red: number; green: number; blue: number },
+	second: { red: number; green: number; blue: number },
+): number {
+	const values = [relativeLuminance(first), relativeLuminance(second)].sort((a, b) => b - a);
+	return (values[0] + 0.05) / (values[1] + 0.05);
+}
+
 export async function analyzeIconQuality(
 	svgMarkup: string,
 ): Promise<IconQualityReport> {
@@ -469,9 +547,39 @@ export async function analyzeIconQuality(
 	const centerY = hasForeground
 		? Math.abs((minY + maxY) / 2 - info.height / 2) / info.height
 		: 0;
-	const elementCount = allElements(root).length - 1,
+	const svgElements = allElements(root).slice(1);
+	const elementCount = svgElements.length,
 		colors = paletteCounts.size,
 		findings: IconQualityFinding[] = [];
+	let minimumStrokeWidthAt48px: number | null = null;
+	for (const element of svgElements) {
+		const stroke = element.getAttribute("stroke");
+		const strokeWidth = Number.parseFloat(element.getAttribute("stroke-width") || "");
+		if (stroke && stroke !== "none" && Number.isFinite(strokeWidth) && strokeWidth > 0) {
+			const renderedWidth = strokeWidth * 48 / Math.max(vw, vh);
+			minimumStrokeWidthAt48px = minimumStrokeWidthAt48px === null
+				? renderedWidth
+				: Math.min(minimumStrokeWidthAt48px, renderedWidth);
+		}
+	}
+	let minimumContrastRatio: number | null = null;
+	if (!transparentBackground && background) {
+		for (const element of svgElements) {
+			for (const attribute of ["fill", "stroke"]) {
+				const raw = element.getAttribute(attribute);
+				if (!raw || raw === "none" || raw === "transparent" || raw.startsWith("url(")) continue;
+				const color = parseQualityColor(raw);
+				if (!color) continue;
+				const backgroundDistance = Math.abs(color.red - background.red) +
+					Math.abs(color.green - background.green) + Math.abs(color.blue - background.blue);
+				if (backgroundDistance < 12) continue;
+				const ratio = contrastRatio(color, background);
+				minimumContrastRatio = minimumContrastRatio === null
+					? ratio
+					: Math.min(minimumContrastRatio, ratio);
+			}
+		}
+	}
 	if (Math.abs(vw - vh) / Math.max(vw, vh) > 0.02)
 		findings.push({
 			severity: "warning",
@@ -495,6 +603,31 @@ export async function analyzeIconQuality(
 			message: "The artwork occupies a small part of the canvas.",
 			recommendation:
 				"Increase artwork size while keeping a clear launcher safe margin.",
+		});
+	if (
+		hasForeground &&
+		(minX < info.width * 0.17 || minY < info.height * 0.17 ||
+			maxX > info.width * 0.83 || maxY > info.height * 0.83)
+	)
+		findings.push({
+			severity: "warning",
+			code: "outside-android-adaptive-safe-zone",
+			message: "Artwork extends beyond the central Android adaptive-icon safe zone.",
+			recommendation: "Keep important artwork inside the central 66% of the foreground canvas and review Android launcher masks.",
+		});
+	if (minimumStrokeWidthAt48px !== null && minimumStrokeWidthAt48px < 1)
+		findings.push({
+			severity: "warning",
+			code: "thin-small-size-stroke",
+			message: "At least one stroke is thinner than 1 px in a 48 px launcher preview.",
+			recommendation: "Increase the thinnest stroke or simplify tiny details, then review the 32 px preview.",
+		});
+	if (minimumContrastRatio !== null && minimumContrastRatio < 3)
+		findings.push({
+			severity: "warning",
+			code: "low-artwork-contrast",
+			message: "Some explicit SVG artwork colors have less than 3:1 contrast against the estimated opaque canvas background.",
+			recommendation: "Increase foreground/background separation. This estimate skips transparent canvases and unsupported color formats.",
 		});
 	if (hasForeground && coverage > 0.78)
 		findings.push({
@@ -570,6 +703,10 @@ export async function analyzeIconQuality(
 			artworkCoverage: Number(coverage.toFixed(4)),
 			horizontalCenterOffset: Number(centerX.toFixed(4)),
 			verticalCenterOffset: Number(centerY.toFixed(4)),
+			minimumStrokeWidthAt48px: minimumStrokeWidthAt48px === null
+				? null : Number(minimumStrokeWidthAt48px.toFixed(3)),
+			minimumContrastRatio: minimumContrastRatio === null
+				? null : Number(minimumContrastRatio.toFixed(2)),
 		},
 		findings,
 		elements: prepared.elements,
@@ -987,19 +1124,49 @@ export function svgToAndroidVectorDrawable(
 }
 
 type ZipFile = { name: string; data: Buffer };
+function createForegroundSvg(svgMarkup: string, monochrome = false): string {
+	const root = parseSvg(svgMarkup).root;
+	const viewBox = (root.getAttribute("viewBox") || "0 0 512 512")
+		.trim().split(/[\s,]+/).map(Number);
+	if (viewBox.length !== 4 || viewBox.some((value) => !Number.isFinite(value)) || viewBox[2] <= 0 || viewBox[3] <= 0)
+		throw new Error("A valid viewBox is required to build adaptive foreground assets.");
+	const backgroundRect = Array.from(root.childNodes).find((node) =>
+		node.nodeType === 1 &&
+		((node as XmlElement).localName || (node as XmlElement).nodeName) === "rect" &&
+		Math.abs(parseNumber(node as XmlElement, "x")) < 0.001 &&
+		Math.abs(parseNumber(node as XmlElement, "y")) < 0.001 &&
+		Math.abs(parseNumber(node as XmlElement, "width") - viewBox[2]) < 0.01 &&
+		Math.abs(parseNumber(node as XmlElement, "height") - viewBox[3]) < 0.01,
+	) as XmlElement | undefined;
+	if (backgroundRect) root.removeChild(backgroundRect);
+	if (monochrome) {
+		root.setAttribute("fill", "#ffffff");
+		root.setAttribute("stroke", "#ffffff");
+		for (const element of allElements(root).slice(1)) {
+			for (const attribute of ["fill", "stroke"]) {
+				const value = element.getAttribute(attribute);
+				if (value && value !== "none" && value !== "transparent")
+					element.setAttribute(attribute, "#ffffff");
+			}
+		}
+	}
+	return serialize(root);
+}
+
 async function renderAssetPng(
 	svgMarkup: string,
 	size: number,
+	opaqueBackground?: string,
 ): Promise<Buffer> {
 	if (!Number.isInteger(size) || size < 16 || size > 1024)
 		throw new Error("Icon asset size must be from 16 to 1024 pixels.");
-	return sharp(Buffer.from(svgMarkup, "utf8"), { density: 144 })
+	let image = sharp(Buffer.from(svgMarkup, "utf8"), { density: 144 })
 		.resize(size, size, {
 			fit: "contain",
 			background: { r: 0, g: 0, b: 0, alpha: 0 },
-		})
-		.png()
-		.toBuffer();
+		});
+	if (opaqueBackground) image = image.flatten({ background: opaqueBackground });
+	return image.png().toBuffer();
 }
 function crc32(buffer: Buffer): number {
 	let crc = 0xffffffff;
@@ -1065,7 +1232,12 @@ function zipFiles(files: ZipFile[]): Buffer {
 }
 export async function exportIconBundle(
 	svgMarkup: string,
-	options: { appName?: string; packageName?: string; pngSizes?: number[] } = {},
+	options: {
+		appName?: string;
+		packageName?: string;
+		pngSizes?: number[];
+		iosBackgroundColor?: string;
+	} = {},
 ): Promise<{
 	zipBase64: string;
 	fileCount: number;
@@ -1081,6 +1253,10 @@ export async function exportIconBundle(
 		});
 	const appName = (options.appName || "App Icon").trim().slice(0, 80),
 		packageName = options.packageName || "com.example.app";
+	const requestedIosBackground = options.iosBackgroundColor || "#ffffff";
+	if (!/^#[0-9a-f]{6}$/i.test(requestedIosBackground))
+		throw new Error("iosBackgroundColor must be a six-digit hex color.");
+	const iosBackgroundColor = requestedIosBackground;
 	if (
 		!/^[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)+$/.test(packageName) ||
 		packageName.length > 160
@@ -1098,8 +1274,8 @@ export async function exportIconBundle(
 	const files: ZipFile[] = [],
 		addText = (name: string, data: string) =>
 			files.push({ name, data: Buffer.from(data, "utf8") });
-	const addPng = async (name: string, size: number) => {
-		const rendered = await renderAssetPng(optimized, size);
+	const addPng = async (name: string, size: number, opaqueBackground?: string) => {
+		const rendered = await renderAssetPng(optimized, size, opaqueBackground);
 		files.push({ name, data: rendered });
 	};
 	addText("source/icon.svg", optimized);
@@ -1141,6 +1317,36 @@ export async function exportIconBundle(
 		);
 	}
 	for (const size of sizes) await addPng("png/icon-" + size + ".png", size);
+	const foregroundSvg = createForegroundSvg(optimized);
+	const monochromeSvg = createForegroundSvg(optimized, true);
+	await addPng("flutter/assets/launcher_icon.png", 1024, iosBackgroundColor);
+	files.push({
+		name: "flutter/assets/adaptive_foreground.png",
+		data: await renderAssetPng(foregroundSvg, 1024),
+	});
+	const monochromePng = await renderAssetPng(monochromeSvg, 1024);
+	files.push({ name: "flutter/assets/adaptive_monochrome.png", data: monochromePng });
+	files.push({ name: "flutter/assets/ios_dark.png", data: monochromePng });
+	files.push({ name: "flutter/assets/ios_tinted.png", data: monochromePng });
+	const flutterConfig = [
+		"flutter_launcher_icons:",
+		"  android: true",
+		"  ios: true",
+		'  image_path: "assets/launcher_icon.png"',
+		"  min_sdk_android: 21",
+		'  adaptive_icon_background: "' + iosBackgroundColor + '"',
+		'  adaptive_icon_foreground: "assets/adaptive_foreground.png"',
+		'  adaptive_icon_monochrome: "assets/adaptive_monochrome.png"',
+		"  remove_alpha_ios: true",
+		'  background_color_ios: "' + iosBackgroundColor + '"',
+		'  image_path_ios_dark_transparent: "assets/ios_dark.png"',
+		'  image_path_ios_tinted_grayscale: "assets/ios_tinted.png"',
+	].join("\n") + "\n";
+	addText("flutter/flutter_launcher_icons.yaml", flutterConfig);
+	addText(
+		"flutter/pubspec.yaml.snippet",
+		"dev_dependencies:\n  flutter_launcher_icons: ^0.14.4\n\n# Copy flutter_launcher_icons.yaml and the assets/ directory to your Flutter project root.\n# Merge the dependency above into the existing dev_dependencies section.\n",
+	);
 	const iosEntries = [
 		{ idiom: "iphone", size: "20x20", scale: "2x", px: 40 },
 		{ idiom: "iphone", size: "20x20", scale: "3x", px: 60 },
@@ -1178,6 +1384,7 @@ export async function exportIconBundle(
 			await addPng(
 				"ios/Assets.xcassets/AppIcon.appiconset/" + filename,
 				entry.px,
+				iosBackgroundColor,
 			);
 		iosImages.push({
 			idiom: entry.idiom,
@@ -1203,6 +1410,8 @@ export async function exportIconBundle(
 			"iOS AppIcon.appiconset",
 			"PNG size variants",
 			"Android foreground and monochrome VectorDrawable",
+			"Flutter Launcher Icons config, adaptive foreground and monochrome assets",
+			"iOS dark and tinted source images for Flutter Launcher Icons",
 		],
 		limitations: [
 			"Android vector export supports paths and basic SVG geometry. Gradients, masks, filters, text and unsupported transforms are rejected rather than silently flattened.",

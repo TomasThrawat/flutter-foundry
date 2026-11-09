@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import type { ChangeEvent } from "react";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 const sample =
 	'<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#000000"/><path d="M150 82 H290 L366 158 V420 H150 Z" fill="#ffffff"/><path d="M290 82 V158 H366" fill="none" stroke="#000000" stroke-width="12" stroke-linejoin="round"/><path d="M205 236 H310 M205 280 H310 M205 324 H310" fill="none" stroke="#000000" stroke-width="18" stroke-linecap="round"/></svg>';
@@ -15,7 +15,7 @@ type Quality = {
 		message: string;
 		recommendation: string;
 	}>;
-	metrics: Record<string, number>;
+	metrics: Record<string, number | null>;
 };
 type ElementSummary = {
 	id: string;
@@ -99,23 +99,56 @@ function parseHistorySnapshot(snapshot: string): Version[] {
 async function requestPipeline(
 	operation: string,
 	payload: Record<string, unknown> = {},
+	signal?: AbortSignal,
 ) {
 	const response = await fetch("/api/icons/pipeline", {
 		method: "POST",
 		headers: { "content-type": "application/json" },
 		body: JSON.stringify({ operation, ...payload }),
+		signal,
 	});
-	const data = await response.json();
+	if (operation === "export") {
+		if (!response.ok) {
+			let message = "Icon pipeline request failed.";
+			try {
+				const error = await response.json();
+				message = error.error || message;
+			} catch {
+				/* Keep the generic service error when the response is not JSON. */
+			}
+			throw new Error(message);
+		}
+		return {
+			blob: await response.blob(),
+			fileCount: Number(response.headers.get("x-icon-file-count")) || 0,
+			bytes: Number(response.headers.get("x-icon-bytes")) || 0,
+		};
+	}
+	let data: Awaited<ReturnType<typeof response.json>>;
+	try {
+		data = await response.json();
+	} catch {
+		throw new Error("The icon service returned an unreadable response.");
+	}
 	if (!response.ok)
 		throw new Error(data.error || "Icon pipeline request failed.");
 	return data;
 }
 
-function downloadBase64(base64: string, mime: string, filename: string) {
-	const binary = atob(base64);
-	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-	const blob = new Blob([bytes], { type: mime });
+async function downloadBase64(base64: string, mime: string, filename: string) {
+	// Let the browser decode large base64 responses natively instead of looping over every byte on the UI thread.
+	const response = await fetch("data:" + mime + ";base64," + base64);
+	if (!response.ok) throw new Error("The generated download could not be decoded.");
+	const blob = await response.blob();
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement("a");
+	link.href = url;
+	link.download = filename;
+	link.click();
+	window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadBlob(blob: Blob, filename: string) {
 	const url = URL.createObjectURL(blob);
 	const link = document.createElement("a");
 	link.href = url;
@@ -149,7 +182,16 @@ export default function IconMakerPage() {
 	const [elements, setElements] = useState<ElementSummary[]>([]);
 	const [selectedElement, setSelectedElement] = useState("");
 	const [editFill, setEditFill] = useState("#ffffff");
-	const [editStroke, setEditStroke] = useState("");
+	const [editStroke, setEditStroke] = useState("#000000");
+	const [editOpacity, setEditOpacity] = useState("");
+	const [editStrokeWidth, setEditStrokeWidth] = useState("");
+	const [translateX, setTranslateX] = useState("");
+	const [translateY, setTranslateY] = useState("");
+	const [editScale, setEditScale] = useState("");
+	const [editRotation, setEditRotation] = useState("");
+	const [newElementTag, setNewElementTag] = useState("circle");
+	const [iosBackgroundColor, setIosBackgroundColor] = useState("#000000");
+	const activeAbortController = useRef<AbortController | null>(null);
 	const [variants, setVariants] = useState<Variant[]>([]);
 	const historySnapshot = useSyncExternalStore(
 		subscribeToHistory,
@@ -174,7 +216,7 @@ export default function IconMakerPage() {
 	const canUndo = historyIndex > 0;
 	const canRedo = historyIndex < history.length - 1;
 
-	function saveVersion(nextSvg: string, label: string) {
+	function saveVersion(nextSvg: string, label: string, preserveVariants = false) {
 		const snapshot = {
 			svg: nextSvg,
 			label,
@@ -185,6 +227,7 @@ export default function IconMakerPage() {
 		const stored = writeHistorySnapshot(next);
 		setSelectedHistoryIndex(next.length - 1);
 		setSvg(nextSvg);
+		if (!preserveVariants) setVariants([]);
 		if (!stored)
 			setStatus(
 				"Browser storage is unavailable; version history is kept in memory for this tab.",
@@ -200,25 +243,60 @@ export default function IconMakerPage() {
 		setPng("");
 		setQuality(null);
 		setElements([]);
+		setVariants([]);
 		setStatus("Restored version: " + version.label);
 	}
 
-	async function runTask(label: string, task: () => Promise<void>) {
+	function cancelTask() {
+		activeAbortController.current?.abort();
+	}
+
+	async function runTask(
+		label: string,
+		task: (signal: AbortSignal) => Promise<void>,
+	) {
+		const controller = new AbortController();
+		activeAbortController.current = controller;
 		setBusy(true);
 		setStatus(label + "…");
+		const timeout = window.setTimeout(() => {
+			controller.abort(new DOMException("The operation timed out after 65 seconds.", "TimeoutError"));
+		}, 65_000);
 		try {
-			await task();
+			await task(controller.signal);
 		} catch (error) {
-			setStatus(
-				error instanceof Error ? error.message : "The icon operation failed.",
-			);
+			const reason = controller.signal.reason;
+			if (reason instanceof DOMException && reason.name === "TimeoutError") {
+				setStatus(reason.message);
+			} else if (
+				controller.signal.aborted ||
+				(error instanceof DOMException && error.name === "AbortError")
+			) {
+				setStatus("Operation cancelled.");
+			} else {
+				setStatus(
+					error instanceof Error ? error.message : "The icon operation failed.",
+				);
+			}
 		} finally {
+			window.clearTimeout(timeout);
+			if (activeAbortController.current === controller)
+				activeAbortController.current = null;
 			setBusy(false);
 		}
 	}
 
+	function updateSvgDraft(value: string) {
+		setSvg(value);
+		setPng("");
+		setQuality(null);
+		setElements([]);
+		setSelectedElement("");
+		setVariants([]);
+	}
+
 	function generate() {
-		return runTask("Generating SVG and PNG", async () => {
+		return runTask("Generating SVG and PNG", async (signal) => {
 			const data = await requestPipeline("generate", {
 				prompt,
 				style,
@@ -226,7 +304,7 @@ export default function IconMakerPage() {
 				backgroundColor,
 				foregroundColor,
 				accentColor,
-			});
+			}, signal);
 			saveVersion(data.svgMarkup, "Generated " + style);
 			setSelectedElement("");
 			setPng(data.pngBase64);
@@ -242,7 +320,7 @@ export default function IconMakerPage() {
 	}
 
 	function createVariants() {
-		return runTask("Creating style variants", async () => {
+		return runTask("Creating style variants", async (signal) => {
 			const data = await requestPipeline("variants", {
 				prompt,
 				size,
@@ -250,7 +328,7 @@ export default function IconMakerPage() {
 				foregroundColor,
 				accentColor,
 				styles: ["minimal", "geometric", "rounded", "outline"],
-			});
+			}, signal);
 			setVariants(data.variants || []);
 			setStatus(
 				"Created " + (data.variants || []).length + " comparable variants.",
@@ -259,7 +337,7 @@ export default function IconMakerPage() {
 	}
 
 	function selectVariant(variant: Variant) {
-		saveVersion(variant.svgMarkup, "Variant " + variant.style);
+		saveVersion(variant.svgMarkup, "Variant " + variant.style, true);
 		setSelectedElement("");
 		setPng(variant.pngBase64);
 		setQuality(variant.quality);
@@ -268,8 +346,8 @@ export default function IconMakerPage() {
 	}
 
 	function analyze() {
-		return runTask("Analyzing and optimizing SVG", async () => {
-			const data = await requestPipeline("analyze", { svgMarkup: svg });
+		return runTask("Analyzing and optimizing SVG", async (signal) => {
+			const data = await requestPipeline("analyze", { svgMarkup: svg }, signal);
 			setSvg(data.svgMarkup);
 			setSelectedElement("");
 			setQuality(data.quality);
@@ -285,6 +363,22 @@ export default function IconMakerPage() {
 		});
 	}
 
+	async function applyElementOperations(
+		operations: Array<Record<string, unknown>>,
+		label: string,
+	) {
+		await runTask(label, async (signal) => {
+			const data = await requestPipeline("edit", { svgMarkup: svg, operations }, signal);
+			saveVersion(data.svgMarkup, label);
+			setPng(String(data.pngBase64 || ""));
+			setQuality(data.quality as Quality);
+			setElements((data.elements || []) as ElementSummary[]);
+			setSelectedElement("");
+			setVariants([]);
+			setStatus(label + " completed. The SVG preview and element list were refreshed.");
+		});
+	}
+
 	async function editSelected() {
 		if (!selectedElement) {
 			setStatus("Select an SVG element first.");
@@ -293,27 +387,70 @@ export default function IconMakerPage() {
 		const attributes: Record<string, string> = {};
 		if (editFill.trim()) attributes.fill = editFill.trim();
 		if (editStroke.trim()) attributes.stroke = editStroke.trim();
+		if (editOpacity.trim()) attributes.opacity = editOpacity.trim();
+		if (editStrokeWidth.trim()) attributes["stroke-width"] = editStrokeWidth.trim();
+		const hasTransform = [translateX, translateY, editScale, editRotation].some((value) => value.trim());
+		if (hasTransform) {
+			const x = Number(translateX || 0);
+			const y = Number(translateY || 0);
+			const scale = Number(editScale || 1);
+			const rotation = Number(editRotation || 0);
+			if (![x, y, scale, rotation].every(Number.isFinite) || scale <= 0) {
+				setStatus("Enter valid transform values. Scale must be greater than zero.");
+				return;
+			}
+			attributes.transform = "translate(" + x + " " + y + ") scale(" + scale + ") rotate(" + rotation + " 256 256)";
+		}
 		if (!Object.keys(attributes).length) {
-			setStatus("Choose a fill or stroke color to apply.");
+			setStatus("Choose at least one property to apply.");
 			return;
 		}
-		await runTask("Applying a targeted element edit", async () => {
-			const data = await requestPipeline("edit", {
-				svgMarkup: svg,
-				operations: [
-					{ id: selectedElement, action: "set-attributes", attributes },
-				],
-			});
-			saveVersion(data.svgMarkup, "Edit " + selectedElement);
-			setPng(data.pngBase64);
-			setQuality(data.quality);
-			setElements(data.elements || []);
-			setStatus(
-				"Updated only " +
-					selectedElement +
-					"; other SVG elements were preserved.",
-			);
-		});
+		await applyElementOperations(
+			[{ id: selectedElement, action: "set-attributes", attributes }],
+			"Edit " + selectedElement,
+		);
+	}
+
+	async function removeSelectedElement() {
+		if (!selectedElement) return;
+		await applyElementOperations(
+			[{ id: selectedElement, action: "remove-element" }],
+			"Delete " + selectedElement,
+		);
+	}
+
+	async function removeSelectedAttribute(attribute: "fill" | "stroke") {
+		if (!selectedElement) return;
+		await applyElementOperations(
+			[{ id: selectedElement, action: "remove-attributes", attributes: [attribute] }],
+			"Remove " + attribute + " from " + selectedElement,
+		);
+	}
+
+	async function addShape() {
+		const usedIds = new Set(elements.map((element) => element.id));
+		for (const match of svg.match(/\bid=["'][^"']+["']/g) || []) {
+			const id = match.match(/^[^=]+=["']([^"']+)["']$/)?.[1];
+			if (id) usedIds.add(id);
+		}
+		let sequence = 1;
+		while (usedIds.has("ff-added-" + sequence)) sequence++;
+		const id = "ff-added-" + sequence;
+		const attributes: Record<string, string> = {};
+		if (newElementTag === "circle") {
+			Object.assign(attributes, { cx: "256", cy: "256", r: "72", fill: editFill });
+		} else if (newElementTag === "rect") {
+			Object.assign(attributes, { x: "160", y: "160", width: "192", height: "192", rx: "24", fill: editFill });
+		} else if (newElementTag === "line") {
+			Object.assign(attributes, { x1: "112", y1: "256", x2: "400", y2: "256", fill: "none", stroke: editStroke || editFill, "stroke-width": editStrokeWidth || "16", "stroke-linecap": "round" });
+		} else {
+			Object.assign(attributes, { d: "M256 112 L400 400 H112 Z", fill: editFill });
+		}
+		if (editOpacity.trim()) attributes.opacity = editOpacity.trim();
+		await applyElementOperations(
+			[{ id, action: "add-element", tag: newElementTag, attributes }],
+			"Add " + newElementTag,
+		);
 	}
 
 	async function importRaster(event: ChangeEvent<HTMLInputElement>) {
@@ -327,7 +464,7 @@ export default function IconMakerPage() {
 			setStatus("Image imports are limited to 5 MB.");
 			return;
 		}
-		await runTask("Vectorizing imported image", async () => {
+		await runTask("Vectorizing imported image", async (signal) => {
 			const imageBase64 = await new Promise<string>((resolve, reject) => {
 				const reader = new FileReader();
 				reader.onerror = () =>
@@ -339,7 +476,7 @@ export default function IconMakerPage() {
 				imageBase64,
 				size: 48,
 				colors: 6,
-			});
+			}, signal);
 			saveVersion(data.svgMarkup, "Imported and vectorized image");
 			setSelectedElement("");
 			setPng(data.pngBase64);
@@ -351,25 +488,26 @@ export default function IconMakerPage() {
 	}
 
 	function editInSvgEdit() {
-		return runTask("Opening SVG-Edit in Chromium", async () => {
+		return runTask("Checking the SVG-Edit round trip", async (signal) => {
 			const response = await fetch("/api/icons/edit", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({ svg }),
+				signal,
 			});
 			const data = await response.json();
 			if (!response.ok)
 				throw new Error(data.error || "SVG-Edit processing failed.");
 			const analysis = await requestPipeline("analyze", {
 				svgMarkup: data.svg,
-			});
+			}, signal);
 			saveVersion(analysis.svgMarkup, "SVG-Edit round trip");
 			setSelectedElement("");
 			setPng(data.previewPngBase64);
 			setQuality(analysis.quality);
 			setElements(analysis.elements || []);
 			setStatus(
-				"SVG-Edit round trip completed in " +
+				"SVG-Edit compatibility round trip completed in " +
 					data.elapsedMs +
 					" ms. The edited SVG was saved as a new version.",
 			);
@@ -377,23 +515,20 @@ export default function IconMakerPage() {
 	}
 
 	function exportBundle() {
-		return runTask("Building Android and iOS icon bundle", async () => {
+		return runTask("Building Android, iOS and Flutter icon bundle", async (signal) => {
 			const data = await requestPipeline("export", {
 				svgMarkup: svg,
 				appName,
 				packageName,
-			});
-			downloadBase64(
-				data.zipBase64,
-				"application/zip",
-				"flutter-foundry-icon-pack.zip",
-			);
+				iosBackgroundColor,
+			}, signal);
+			downloadBlob(data.blob, "flutter-foundry-icon-pack.zip");
 			setStatus(
 				"Exported " +
 					data.fileCount +
 					" files (" +
 					Math.round(data.bytes / 1024) +
-					" KB) for Android and iOS.",
+					" KB) for Android, iOS and Flutter.",
 			);
 		});
 	}
@@ -549,6 +684,9 @@ export default function IconMakerPage() {
 					<p className="status" aria-live="polite">
 						{status}
 					</p>
+					<button type="button" className="button" disabled={!busy} onClick={cancelTask}>
+						Cancel operation
+					</button>
 				</section>
 
 				<section className="card">
@@ -730,7 +868,7 @@ export default function IconMakerPage() {
 							id="svg-input"
 							spellCheck={false}
 							value={svg}
-							onChange={(event) => setSvg(event.target.value)}
+							onChange={(event) => updateSvgDraft(event.target.value)}
 							style={{ minHeight: 300 }}
 						/>
 					</div>
@@ -781,6 +919,51 @@ export default function IconMakerPage() {
 						Targeted edits only change the selected element. Unsupported or
 						unsafe SVG attributes are rejected.
 					</p>
+					<div className="actions" style={{ flexWrap: "wrap", marginTop: 12 }}>
+						<label className="field">
+							Opacity (0–1)
+							<input aria-label="Element opacity" type="number" min="0" max="1" step="0.05" placeholder="Keep current" value={editOpacity} onChange={(event) => setEditOpacity(event.target.value)} />
+						</label>
+						<label className="field">
+							Stroke width
+							<input aria-label="Element stroke width" type="number" min="0" max="128" step="1" placeholder="Keep current" value={editStrokeWidth} onChange={(event) => setEditStrokeWidth(event.target.value)} />
+						</label>
+						<label className="field">
+							Move X
+							<input aria-label="Move X" type="number" min="-512" max="512" placeholder="0" value={translateX} onChange={(event) => setTranslateX(event.target.value)} />
+						</label>
+						<label className="field">
+							Move Y
+							<input aria-label="Move Y" type="number" min="-512" max="512" placeholder="0" value={translateY} onChange={(event) => setTranslateY(event.target.value)} />
+						</label>
+						<label className="field">
+							Scale
+							<input aria-label="Element scale" type="number" min="0.1" max="5" step="0.1" placeholder="1" value={editScale} onChange={(event) => setEditScale(event.target.value)} />
+						</label>
+						<label className="field">
+							Rotation (degrees)
+							<input aria-label="Element rotation" type="number" min="-360" max="360" step="1" placeholder="0" value={editRotation} onChange={(event) => setEditRotation(event.target.value)} />
+						</label>
+					</div>
+					<div className="actions" style={{ flexWrap: "wrap", marginTop: 12 }}>
+						<button type="button" className="button primary" disabled={busy || !selectedElement} onClick={editSelected}>Apply properties</button>
+						<button type="button" className="button" disabled={busy || !selectedElement} onClick={() => removeSelectedAttribute("fill")}>Remove fill</button>
+						<button type="button" className="button" disabled={busy || !selectedElement} onClick={() => removeSelectedAttribute("stroke")}>Remove stroke</button>
+						<button type="button" className="button" disabled={busy || !selectedElement} onClick={removeSelectedElement}>Delete selected element</button>
+					</div>
+					<div className="actions" style={{ flexWrap: "wrap", marginTop: 12 }}>
+						<label className="field">
+							Add shape
+							<select className="button" value={newElementTag} onChange={(event) => setNewElementTag(event.target.value)}>
+								<option value="circle">Circle</option>
+								<option value="rect">Rounded rectangle</option>
+								<option value="path">Triangle</option>
+								<option value="line">Line</option>
+							</select>
+						</label>
+						<button type="button" className="button" disabled={busy || !svg.trim()} onClick={addShape}>Add shape</button>
+					</div>
+					<p className="small">Shape insertion and attribute changes are validated on the server. Translate, scale and rotation apply to the selected SVG element; Undo restores prior versions.</p>
 					<div className="actions" style={{ marginTop: 14 }}>
 						<button
 							type="button"
@@ -804,7 +987,7 @@ export default function IconMakerPage() {
 							disabled={busy}
 							onClick={editInSvgEdit}
 						>
-							Open in SVG-Edit
+							Check via SVG-Edit
 						</button>
 						<button
 							type="button"
@@ -863,6 +1046,7 @@ export default function IconMakerPage() {
 								{Math.round(quality.metrics.artworkCoverage * 100)}% artwork
 								bounding-box coverage
 							</p>
+							<p className="small">Minimum stroke at 48 px: {quality.metrics.minimumStrokeWidthAt48px == null ? "not detected" : quality.metrics.minimumStrokeWidthAt48px + " px"} · Minimum opaque-canvas contrast: {quality.metrics.minimumContrastRatio == null ? "not measured" : quality.metrics.minimumContrastRatio + ":1"}</p>
 							{quality.findings.map((finding) => (
 								<div
 									key={finding.code}
@@ -891,8 +1075,7 @@ export default function IconMakerPage() {
 			<section className="card" style={{ marginTop: 20 }}>
 				<h2>5. Export a complete icon pack</h2>
 				<p>
-					Build Android adaptive icons, monochrome VectorDrawable, legacy
-					density PNGs, iOS AppIcon assets and extra PNG sizes in one ZIP.
+					Build Android adaptive icons, iOS AppIcon assets, Flutter Launcher Icons configuration and source images in one ZIP.
 				</p>
 				<div className="actions" style={{ flexWrap: "wrap" }}>
 					<label className="field" style={{ flex: "1 1 200px" }}>
@@ -909,19 +1092,21 @@ export default function IconMakerPage() {
 							onChange={(event) => setPackageName(event.target.value)}
 						/>
 					</label>
+					<label className="field">
+						iOS background for transparent source icons
+						<input aria-label="iOS background color" type="color" value={iosBackgroundColor} onChange={(event) => setIosBackgroundColor(event.target.value)} />
+					</label>
 					<button
 						type="button"
 						className="button primary"
 						disabled={busy || !svg.trim()}
 						onClick={exportBundle}
 					>
-						{busy ? "Preparing…" : "Export Android + iOS ZIP"}
+						{busy ? "Preparing…" : "Export Android + iOS + Flutter ZIP"}
 					</button>
 				</div>
 				<p className="small">
-					The Android VectorDrawable exporter supports paths and basic vector
-					shapes. Gradients, masks, filters, text and unsupported transforms are
-					reported instead of being silently flattened.
+					The ZIP includes Flutter Launcher Icons configuration and assets for Android adaptive icons, iOS alpha-free icons, and iOS dark/tinted sources. Android VectorDrawable conversion still rejects unsupported SVG features rather than silently changing their appearance.
 				</p>
 			</section>
 		</section>

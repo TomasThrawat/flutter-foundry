@@ -101,3 +101,18 @@ test("recognizes additional utility concepts in English and Arabic", () => {
 		assert.match(sanitizeSvgInput(generated.svgMarkup), /^<svg/);
 	}
 });
+
+
+test("renders complete camera, code and book concept geometry", () => {
+	const camera = generateIconFromPrompt({ prompt: "minimal camera icon", style: "minimal" });
+	const code = generateIconFromPrompt({ prompt: "code brackets with slash icon", style: "minimal" });
+	const book = generateIconFromPrompt({ prompt: "open book icon", style: "minimal" });
+	assert.equal(camera.concept, "camera");
+	assert.ok((camera.svgMarkup.match(/<rect /g) || []).length >= 2);
+	assert.ok((camera.svgMarkup.match(/<circle /g) || []).length >= 3);
+	assert.equal(code.concept, "code");
+	assert.ok((code.svgMarkup.match(/<path /g) || []).length >= 3);
+	assert.equal(book.concept, "book");
+	assert.ok((book.svgMarkup.match(/<path /g) || []).length >= 2);
+	assert.ok((book.svgMarkup.match(/<line /g) || []).length >= 4);
+});

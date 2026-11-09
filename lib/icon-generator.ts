@@ -500,7 +500,7 @@ export function generateIconFromPrompt(
 			path("M164 290 L256 198 L348 290", "none", accent, 28);
 		}
 	} else if (concept === "camera") {
-		rect(98, 178, 316, 224, main, radius + 8, edge, ew);	} else if (concept === "camera") {
+		rect(98, 178, 316, 224, main, radius + 8, edge, ew);
 		rect(98, 178, 316, 224, main, radius + 8, edge, ew);
 		rect(154, 132, 92, 56, main, radius, edge, ew);
 		circle(
@@ -611,7 +611,7 @@ export function generateIconFromPrompt(
 				rect(88 + c * 35, 178 + r * 48, 23, 28, outline ? "none" : (r === 2 && c === 4 ? accent : negative), style === "rounded" ? 6 : 2, outline ? fg : "none", outline ? 5 : 0);
 		rect(176, 324, 160, 26, outline ? "none" : accent, 7, outline ? fg : "none", outline ? 5 : 0);
 	} else if (concept === "code") {
-		path("M202 154 L104 256 L202 358", "none", fg, 27);	} else if (concept === "code") {
+		path("M202 154 L104 256 L202 358", "none", fg, 27);
 		path("M202 154 L104 256 L202 358", "none", fg, 27);
 		path("M310 154 L408 256 L310 358", "none", fg, 27);
 		path("M282 126 L230 386", "none", accent, 23);
@@ -676,7 +676,7 @@ export function generateIconFromPrompt(
 		line(174, 322, 310, 322, outline ? fg : negative, 12);
 		line(174, 370, 286, 370, outline ? fg : negative, 12);
 	} else if (concept === "book") {
-		path("M86 126 Q168 96 250 148 V388 Q168 336 86 366 Z", main, edge, ew);	} else if (concept === "book") {
+		path("M86 126 Q168 96 250 148 V388 Q168 336 86 366 Z", main, edge, ew);
 		path("M86 126 Q168 96 250 148 V388 Q168 336 86 366 Z", main, edge, ew);
 		path("M426 126 Q344 96 262 148 V388 Q344 336 426 366 Z", main, edge, ew);
 		line(256, 150, 256, 389, negative, 10);
