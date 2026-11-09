@@ -45,7 +45,6 @@ The quality score is based on heuristic raster measurements. Transparent canvase
     npm run build
     npm run test:svg-edit
 
-
 ## Remaining format boundaries
 
 - Android VectorDrawable export remains intentionally strict. Unsupported gradients, masks, filters, clipping paths, text and complex transforms return an explicit error instead of generating a vector resource with altered appearance. The PNG exports preserve the rendered SVG as the compatibility fallback.

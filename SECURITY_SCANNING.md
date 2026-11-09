@@ -27,7 +27,6 @@ Review findings and fix them rather than adding broad ignores. Each scanner and 
 
 **Deployment note:** the scanner gate blocks test/build jobs in the GitHub Actions workflow. It does not independently block a separate Vercel deployment unless deployment policy requires the relevant CI check.
 
-
 ## Public API request boundaries
 
 - The icon pipeline caps JSON request bodies at 9 MiB to accommodate the bounded raster-import payload; the browser SVG-Edit endpoint caps them at 300 KiB.
