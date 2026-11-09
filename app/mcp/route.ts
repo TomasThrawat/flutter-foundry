@@ -958,33 +958,38 @@ const handler = createMcpHandler((server) => {
 				svgMarkup: z.string().min(20).max(250000),
 				operations: z
 					.array(
-						z
-							.object({
+						z.discriminatedUnion("action", [
+							z.object({
 								id: z.string().min(1).max(128),
-								action: z.enum([
-									"set-attributes",
-									"remove-attributes",
-									"remove-element",
-								]),
-								attributes: z.record(z.string(), z.string()).optional(),
-								removeAttributes: z.array(z.string()).min(1).max(12).optional(),
-							})
-							.strict(),
+								action: z.literal("set-attributes"),
+								attributes: z.record(z.string(), z.string()),
+							}).strict(),
+							z.object({
+								id: z.string().min(1).max(128),
+								action: z.literal("remove-attributes"),
+								removeAttributes: z.array(z.string()).min(1).max(12),
+							}).strict(),
+							z.object({
+								id: z.string().min(1).max(128),
+								action: z.literal("remove-element"),
+							}).strict(),
+					])
 					)
 					.min(1)
 					.max(20),
 			})
 			.strict(),
 		async (input) => {
-			const operations = input.operations.map((item) =>
-				item.action === "remove-attributes"
-					? {
-							id: item.id,
-							action: item.action,
-							attributes: item.removeAttributes || [],
-						}
-					: item,
-			);
+			const operations = input.operations.map((item) => {
+				if (item.action === "remove-attributes") {
+					return {
+						id: item.id,
+						action: "remove-attributes" as const,
+						attributes: item.removeAttributes,
+					};
+				}
+				return item;
+			});
 			const edited = editSvgElements(input.svgMarkup, operations);
 			const [png, quality] = await Promise.all([
 				renderIconPng(edited.svgMarkup, 512),

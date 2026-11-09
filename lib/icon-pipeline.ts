@@ -1,5 +1,5 @@
 import { deflateRawSync } from "node:zlib";
-import { DOMParser, XMLSerializer } from "@xmldom/xmldom";
+import { DOMParser, XMLSerializer, type Document as XmlDocument, type Element as XmlElement } from "@xmldom/xmldom";
 import sharp from "sharp";
 import {
 	generateIconFromPrompt,
@@ -8,7 +8,6 @@ import {
 } from "./icon-generator";
 import { renderIconPng, validateCustomIconSvg } from "./icon-png";
 
-type XmlElement = Element;
 const SAFE_TAGS = new Set([
 	"svg",
 	"g",
@@ -86,7 +85,7 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const ANDROID_NS = "http://schemas.android.com/apk/res/android";
 
 function parseSvg(svgMarkup: string): {
-	doc: Document;
+	doc: XmlDocument;
 	root: XmlElement;
 	clean: string;
 } {
@@ -106,7 +105,7 @@ function parseSvg(svgMarkup: string): {
 		throw new Error(
 			"The SVG could not be parsed as a single valid SVG document.",
 		);
-	const nodes = Array.from(root.getElementsByTagName("*")) as XmlElement[];
+	const nodes = Array.from(root.getElementsByTagName("*"));
 	for (const node of [root, ...nodes]) {
 		const tag = node.localName || node.nodeName;
 		if (!SAFE_TAGS.has(tag))
@@ -143,7 +142,7 @@ function parseSvg(svgMarkup: string): {
 function allElements(root: XmlElement): XmlElement[] {
 	return [
 		root,
-		...(Array.from(root.getElementsByTagName("*")) as XmlElement[]),
+		...Array.from(root.getElementsByTagName("*")),
 	];
 }
 function serialize(root: XmlElement): string {
@@ -866,7 +865,7 @@ export function svgToAndroidVectorDrawable(
 	const backgroundRect = Array.from(root.childNodes).find(
 		(node) =>
 			node.nodeType === 1 &&
-			((node as Element).localName || (node as Element).nodeName) === "rect" &&
+			((node as XmlElement).localName || (node as XmlElement).nodeName) === "rect" &&
 			Math.abs(parseNumber(node as Element, "x")) < 0.001 &&
 			Math.abs(parseNumber(node as Element, "y")) < 0.001 &&
 			Math.abs(parseNumber(node as Element, "width") - vw) < 0.01 &&
@@ -885,7 +884,7 @@ export function svgToAndroidVectorDrawable(
 		if (tag === "svg")
 			return Array.from(element.childNodes)
 				.map((child) =>
-					child.nodeType === 1 ? renderNode(child as Element, inherited) : "",
+					child.nodeType === 1 ? renderNode(child as XmlElement, inherited) : "",
 				)
 				.join("");
 		if (tag === "g") {
@@ -896,7 +895,7 @@ export function svgToAndroidVectorDrawable(
 			};
 			const body = Array.from(element.childNodes)
 				.map((child) =>
-					child.nodeType === 1 ? renderNode(child as Element, state) : "",
+					child.nodeType === 1 ? renderNode(child as XmlElement, state) : "",
 				)
 				.join("");
 			const transform = element.getAttribute("transform");
