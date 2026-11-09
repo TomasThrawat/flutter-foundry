@@ -165,6 +165,9 @@ function inferColor(
 function conceptOf(p: string): string {
 	const rules: Array<[string, RegExp]> = [
 		["qr-code", /(?:\bqr\b|qr[- ]?code|barcode|باركود|كيو\s*آر)/i],
+		["send", /(?:\bsend\b|paper[\s-]?plane|outgoing|telegram|إرسال|ارسال|ارسل|طائرة ورقية)/i],
+		["trash", /(?:\btrash\b|delete|garbage|recycle bin|trash can|سلة المهملات|سلة مهملات|سلة قمامة|حذف|مهملات)/i],
+		["phone", /(?:\bphone\b|telephone|handset|\bdial\b|\bcall\b|هاتف|اتصال|مكالمة|مكالمة هاتفية)/i],
 		["camera", /(?:camera|photo|photography|picture|كاميرا|تصوير|صورة)/i],
 		["calculator", /(?:calculator|math|arithmetic|آلة حاسبة|حاسبة)/i],
 		[
@@ -429,6 +432,34 @@ export function generateIconFromPrompt(
 			rect(start + 6 * cell, start + i * cell, cell, cell, fg);
 		}
 		if (accent !== fg) rect(242, 242, 28, 28, accent, radius);
+	} else if (concept === "send") {
+		path(
+			"M66 249 L441 75 L338 423 Q334 438 321 426 L246 349 L204 397 Q195 405 196 389 L207 298 L381 154 L181 302 L75 265 Q59 259 66 249 Z",
+			main,
+			edge,
+			ew,
+		);
+		path(
+			"M207 298 L381 154 L246 349 Z",
+			outline ? "none" : negative,
+			outline ? fg : "none",
+			outline ? 10 : 0,
+		);
+	} else if (concept === "trash") {
+		rect(145, 164, 222, 258, main, style === "rounded" ? 22 : 12, edge, ew);
+		rect(120, 126, 272, 34, main, 10, edge, ew);
+		rect(202, 88, 108, 32, main, 10, edge, ew);
+		line(207, 218, 207, 360, outline ? fg : negative, 13);
+		line(256, 218, 256, 360, outline ? fg : negative, 13);
+		line(305, 218, 305, 360, outline ? fg : negative, 13);
+	} else if (concept === "phone") {
+		path(
+			"M145 83 C126 83 107 100 105 123 C98 198 155 294 220 354 C285 414 365 441 411 408 C431 394 439 369 425 350 L382 294 C370 278 350 274 333 284 L294 308 C268 294 225 254 205 224 L229 190 C239 175 237 157 225 144 L178 96 C169 87 157 83 145 83 Z",
+			main,
+			edge,
+			ew,
+		);
+		if (!outline) path("M145 120 C133 123 128 135 130 151 C140 211 183 269 230 315", "none", negative, 11);
 	} else if (concept === "camera") {
 		rect(98, 178, 316, 224, main, radius + 8, edge, ew);
 		rect(154, 132, 92, 56, main, radius, edge, ew);
@@ -867,6 +898,7 @@ export function generateIconFromPrompt(
 		notes: [
 			"The artwork is synthesized from vector primitives and a prompt-derived seed; no preset SVG files or image API are used.",
 			"QR-themed output is a visual motif, not a scannable QR payload. Use a QR encoder when machine-readable codes are required.",
+			"Prompt matching uses a deterministic concept vocabulary; unsupported subjects fall back to abstract geometry rather than semantic image understanding.",
 		],
 	};
 }
