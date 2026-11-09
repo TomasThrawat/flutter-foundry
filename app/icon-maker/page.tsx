@@ -188,6 +188,8 @@ export default function IconMakerPage() {
 	const [selectedElement, setSelectedElement] = useState("");
 	const [editFill, setEditFill] = useState("#ffffff");
 	const [editStroke, setEditStroke] = useState("#000000");
+	const [applyFill, setApplyFill] = useState(false);
+	const [applyStroke, setApplyStroke] = useState(false);
 	const [editOpacity, setEditOpacity] = useState("");
 	const [editStrokeWidth, setEditStrokeWidth] = useState("");
 	const [translateX, setTranslateX] = useState("");
@@ -413,8 +415,8 @@ export default function IconMakerPage() {
 			return;
 		}
 		const attributes: Record<string, string> = {};
-		if (editFill.trim()) attributes.fill = editFill.trim();
-		if (editStroke.trim()) attributes.stroke = editStroke.trim();
+		if (applyFill && editFill.trim()) attributes.fill = editFill.trim();
+		if (applyStroke && editStroke.trim()) attributes.stroke = editStroke.trim();
 		if (editOpacity.trim()) attributes.opacity = editOpacity.trim();
 		if (editStrokeWidth.trim())
 			attributes["stroke-width"] = editStrokeWidth.trim();
@@ -983,19 +985,43 @@ export default function IconMakerPage() {
 					</div>
 					<div className="actions">
 						<label className="field">
-							New fill{" "}
+							<span>
+								<input
+									type="checkbox"
+									aria-label="Apply fill color"
+									checked={applyFill}
+									onChange={(event) => setApplyFill(event.target.checked)}
+								/>{" "}
+								Apply fill
+							</span>
 							<input
 								type="color"
+								aria-label="New fill color"
 								value={editFill}
-								onChange={(event) => setEditFill(event.target.value)}
+								onChange={(event) => {
+									setEditFill(event.target.value);
+									setApplyFill(true);
+								}}
 							/>
 						</label>
 						<label className="field">
-							New stroke{" "}
+							<span>
+								<input
+									type="checkbox"
+									aria-label="Apply stroke color"
+									checked={applyStroke}
+									onChange={(event) => setApplyStroke(event.target.checked)}
+								/>{" "}
+								Apply stroke
+							</span>
 							<input
 								type="color"
-								value={editStroke || "#000000"}
-								onChange={(event) => setEditStroke(event.target.value)}
+								aria-label="New stroke color"
+								value={editStroke}
+								onChange={(event) => {
+									setEditStroke(event.target.value);
+									setApplyStroke(true);
+								}}
 							/>
 						</label>
 						<button

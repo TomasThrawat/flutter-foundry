@@ -14,6 +14,40 @@ test("generates an icon, inserts a safe shape, and removes the selected element"
 			page.getByLabel("Target element").locator("option").count(),
 		)
 		.toBeGreaterThan(1);
+	await expect(page.getByLabel("Apply fill color")).not.toBeChecked();
+	await expect(page.getByLabel("Apply stroke color")).not.toBeChecked();
+
+	const targetSelect = page.getByLabel("Target element");
+	const selectedId = await targetSelect
+		.locator("option")
+		.nth(1)
+		.getAttribute("value");
+	if (!selectedId)
+		throw new Error("Generated SVG element has no selectable id.");
+	const elementNode = (markup: string) =>
+		(markup.match(/<[^>]+>/g) ?? []).find((node) =>
+			node.includes(`id="${selectedId}"`),
+		);
+	const originalNode = elementNode(await svg.inputValue());
+	if (!originalNode) throw new Error("Selected SVG element could not be read.");
+	const originalFill = originalNode.match(/fill="([^"]+)"/)?.[1] ?? null;
+	const originalStroke = originalNode.match(/stroke="([^"]+)"/)?.[1] ?? null;
+	await targetSelect.selectOption(selectedId);
+	await page.getByLabel("Move X").fill("12");
+	await page.getByRole("button", { name: "Apply properties" }).click();
+	await expect
+		.poll(async () =>
+			(await svg.inputValue()).includes('transform="translate(12 0)'),
+		)
+		.toBe(true);
+	const transformedNode = elementNode(await svg.inputValue());
+	if (!transformedNode)
+		throw new Error("Transformed SVG element could not be read.");
+	const transformedFill = transformedNode.match(/fill="([^"]+)"/)?.[1] ?? null;
+	const transformedStroke =
+		transformedNode.match(/stroke="([^"]+)"/)?.[1] ?? null;
+	expect(transformedFill).toBe(originalFill);
+	expect(transformedStroke).toBe(originalStroke);
 
 	await page.getByLabel("Add shape").selectOption("circle");
 	await page.getByRole("button", { name: "Add shape" }).click();
