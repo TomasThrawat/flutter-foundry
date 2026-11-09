@@ -4,10 +4,10 @@ Flutter Foundry exposes a unified icon workflow at /icon-maker and through the /
 
 ## Capabilities
 
-- Prompt-driven deterministic SVG generation with minimal, geometric, rounded, outline, pixel and abstract styles. The procedural generator does not call a paid image API.
+- Prompt-driven deterministic SVG generation with minimal, geometric, rounded, outline, pixel and abstract styles. Common send/paper-plane, trash and phone concepts are recognized in English and Arabic; unsupported subjects deliberately fall back to abstract geometry rather than claiming semantic image understanding. The procedural generator does not call a paid image API.
 - Multi-style variants from one prompt, with PNG previews for direct comparison.
 - SVG element preparation with stable IDs and targeted safe edits. Only selected elements are changed; supported operations are set attributes, remove attributes and remove element.
-- Automated heuristic quality report for viewBox shape, visible artwork bounds, margins, centering, element count and approximate rendered palette size. Scores and findings are advisory.
+- Automated heuristic quality report for viewBox shape, visible artwork bounds, margins, centering, element count and approximate rendered palette size. The UI also previews common launcher masks and 32/48/64-pixel legibility. Scores and findings are advisory.
 - SVG validation and whitespace optimization.
 - Raster import for PNG, JPEG and WebP. The conversion uses a limited-color, low-resolution rectangle trace and preserves quantized pixel transparency as SVG fill opacity. It is intended for flat artwork and pixel-style graphics, not photo-faithful vector tracing.
 - ZIP export with source SVG, multiple PNG sizes, Android adaptive icon resources, monochrome and foreground VectorDrawable resources, legacy density PNGs and an iOS AppIcon asset catalog.
@@ -44,3 +44,9 @@ The quality score is based on heuristic raster measurements. Transparent canvase
     npm run lint
     npm run build
     npm run test:svg-edit
+
+## Remaining format boundaries
+
+- Android VectorDrawable export remains intentionally strict. Unsupported gradients, masks, filters, clipping paths, text and complex transforms return an explicit error instead of generating a vector resource with altered appearance. The PNG exports preserve the rendered SVG as the compatibility fallback.
+
+- Prompt interpretation is deterministic keyword/concept routing with authored vector geometry; it is not a general image model. Review the preview and SVG before shipping.

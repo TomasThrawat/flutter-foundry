@@ -32,7 +32,7 @@ test("ARB comparison reports missing keys and placeholders", () => {
 		done: "Done",
 	});
 	const r = checkLocalizations(base, {
-		"ar.arb": JSON.stringify({
+		"app_ar.arb": JSON.stringify({
 			"@@locale": "ar",
 			hello: "ÙØ±Ø­Ø¨Ø§",
 			extra: "x",
@@ -59,4 +59,42 @@ test("accessibility scan identifies possible missing labels", () => {
 	]);
 	assert.ok(r.findings.some((x) => x.issue.includes("IconButton")));
 	assert.ok(r.findings.some((x) => x.issue.includes("Image")));
+});
+
+test("build log analyzer identifies Flutter assets and reports its earliest root cause", () => {
+	const r = analyzeBuildLog(
+		"Unable to load asset: assets/icons/send.png\nDuplicate class com.example.Widget found in modules a.jar and b.jar",
+	);
+	assert.equal(r.findings[0].category, "Flutter asset");
+	assert.equal(r.likelyRootCause?.category, "Flutter asset");
+	assert.equal(r.likelyRootCause?.line, 1);
+});
+
+test("ARB reports locale direction and warns when the file name conflicts with @@locale", () => {
+	const r = checkLocalizations(
+		JSON.stringify({ "@@locale": "en", title: "Title" }),
+		{
+			"app_ar.arb": JSON.stringify({ "@@locale": "ar", title: "العنوان" }),
+			"app_he.arb": JSON.stringify({ "@@locale": "en", title: "Title" }),
+			"app.arb": JSON.stringify({ "@@locale": "ar", title: "العنوان" }),
+		},
+	);
+	assert.equal(r.reports[0].direction, "rtl");
+	assert.equal(r.reports[0].localeMismatch, false);
+	assert.equal(r.reports[1].direction, "ltr");
+	assert.equal(r.reports[1].localeMismatch, true);
+	assert.equal(r.reports[1].complete, false);
+	assert.equal(r.reports[2].localeMismatch, false);
+});
+
+test("Android audit distinguishes permission-gated exported components and flags sensitive permissions", () => {
+	const r = auditAndroidFiles(
+		'<manifest><uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/><application><activity android:name=".Open" android:exported="true"/><service android:name=".Guarded" android:exported="true" android:permission="com.example.ACCESS"/></application></manifest>',
+	);
+	assert.ok(
+		r.some(
+			(x) => x.title === "Exported component has no component-level permission",
+		),
+	);
+	assert.ok(r.some((x) => x.title === "All-files access permission requested"));
 });

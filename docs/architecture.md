@@ -11,3 +11,11 @@
 
 - MCP also registers a unified audit module with an engine catalog, local CLI status probes, source-text heuristics and allowlisted scanner adapters. Native scanner binaries are not bundled into Vercel.
 - Audit subprocesses use fixed arguments without a shell and are restricted to AUDIT_ALLOWED_ROOTS. Output is bounded and sanitized before returning to MCP clients.
+
+## Flutter CLI boundary
+
+- The flutter-analyze engine invokes the fixed command flutter analyze --no-pub; it does not run pub get, tests, build scripts or arbitrary user-supplied commands.
+
+- It is available only when a Flutter SDK is installed on the host and the target directory resolves inside AUDIT_ALLOWED_ROOTS. The repository must contain pubspec.yaml.
+
+- Vercel deployments do not bundle the Flutter SDK, so the engine is expected to report not_installed there. Supplied build logs and source snippets continue to use heuristic static triage.

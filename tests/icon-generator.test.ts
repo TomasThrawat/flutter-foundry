@@ -57,3 +57,23 @@ test("rejects invalid prompt, dimensions, and colors", () => {
 		/Unsupported color/,
 	);
 });
+
+test("recognizes send, trash and phone icons in English and Arabic", () => {
+	const cases = [
+		{ prompt: "minimal send paper plane icon", concept: "send" },
+		{ prompt: "أيقونة إرسال على خلفية سوداء", concept: "send" },
+		{ prompt: "white trash can delete icon", concept: "trash" },
+		{ prompt: "أيقونة سلة مهملات للحذف", concept: "trash" },
+		{ prompt: "simple telephone handset icon", concept: "phone" },
+		{ prompt: "أيقونة هاتف للاتصال", concept: "phone" },
+	];
+	for (const item of cases) {
+		const generated = generateIconFromPrompt({
+			prompt: item.prompt,
+			style: "minimal",
+		});
+		assert.equal(generated.concept, item.concept, item.prompt);
+		assert.match(sanitizeSvgInput(generated.svgMarkup), /^<svg/);
+		assert.match(generated.svgMarkup, /<path|<rect/);
+	}
+});
