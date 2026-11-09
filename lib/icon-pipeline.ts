@@ -866,10 +866,10 @@ export function svgToAndroidVectorDrawable(
 		(node) =>
 			node.nodeType === 1 &&
 			((node as XmlElement).localName || (node as XmlElement).nodeName) === "rect" &&
-			Math.abs(parseNumber(node as Element, "x")) < 0.001 &&
-			Math.abs(parseNumber(node as Element, "y")) < 0.001 &&
-			Math.abs(parseNumber(node as Element, "width") - vw) < 0.01 &&
-			Math.abs(parseNumber(node as Element, "height") - vh) < 0.01,
+			Math.abs(parseNumber(node as XmlElement, "x")) < 0.001 &&
+			Math.abs(parseNumber(node as XmlElement, "y")) < 0.001 &&
+			Math.abs(parseNumber(node as XmlElement, "width") - vw) < 0.01 &&
+			Math.abs(parseNumber(node as XmlElement, "height") - vh) < 0.01,
 	) as XmlElement | undefined;
 	const bgRaw =
 			backgroundRect?.getAttribute("fill") ||
