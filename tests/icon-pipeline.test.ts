@@ -315,5 +315,5 @@ test("rejects SVG gradients and filters rather than silently changing Android ve
 	const filtered =
 		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><filter id="blur"><feGaussianBlur stdDeviation="2"/></filter><circle cx="256" cy="256" r="100" filter="url(#blur)"/></svg>';
 	assert.throws(() => svgToAndroidVectorDrawable(gradient), /cannot convert/i);
-	assert.throws(() => svgToAndroidVectorDrawable(filtered), /cannot convert <filter>/i);
+	assert.throws(() => svgToAndroidVectorDrawable(filtered), /unsupported or unsafe SVG element: <filter>/i);
 });
