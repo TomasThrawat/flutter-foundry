@@ -1,5 +1,7 @@
-import { type ChildProcess, spawn } from "node:child_process";
-import { type Dirent, readdirSync, realpathSync, statSync } from "node:fs";
+import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
+import type { Dirent } from "node:fs";
+import { readdirSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 
@@ -850,6 +852,7 @@ async function execute(id: string, root: string, timeout: number) {
 				: "Non-zero exit may indicate findings, a scan error or incompatible CLI flags.",
 	};
 }
+
 type AuditToolRegistrar = <TInput>(
 	name: string,
 	title: string,

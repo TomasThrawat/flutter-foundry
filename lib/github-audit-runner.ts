@@ -42,14 +42,11 @@ export function isSafeGitHubRef(value: string): boolean {
 		!value.includes("@{")
 	);
 }
+
 type GitHubApiObject = Record<string, unknown>;
 
 function isGitHubApiObject(value: unknown): value is GitHubApiObject {
-	return (
-		typeof value === "object" &&
-		value !== null &&
-		!Array.isArray(value)
-	);
+	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 type GitHubRun = {
@@ -107,6 +104,7 @@ async function githubRequest(
 	}
 	return { status: response.status, data };
 }
+
 function apiError(status: number, message?: unknown): Error {
 	if (status === 401)
 		return new Error(
@@ -120,10 +118,10 @@ function apiError(status: number, message?: unknown): Error {
 		return new Error(
 			"The target repository or audit workflow was not found, or the token cannot access it.",
 		);
-	const detail =
-		typeof message === "string" ? `: ${message.slice(0, 180)}` : ".";
+	const detail = typeof message === "string" ? `: ${message.slice(0, 180)}` : ".";
 	return new Error(`GitHub API request failed (${status})${detail}`);
 }
+
 type Registrar = <TInput>(
 	name: string,
 	title: string,

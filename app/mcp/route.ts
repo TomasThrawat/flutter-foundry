@@ -387,12 +387,14 @@ const handler = createMcpHandler((server) => {
 					"permissions:",
 					"  contents: read",
 					"concurrency:",
-					"  group: flutter-ci-" +
-					"$" +
-					"{{ github.workflow }}" +
-					"-" +
-					"$" +
-					"{{ github.ref }}",
+					[
+						"  group: flutter-ci-",
+						"$",
+						"{{ github.workflow }}",
+						"-",
+						"$",
+						"{{ github.ref }}",
+					].join(""),
 					"  cancel-in-progress: true",
 					"jobs:",
 					"  verify:",
