@@ -9,6 +9,7 @@
 - Static accessibility/Android findings are heuristics; OSV checks exact versions supplied by the caller.
 - Flutter CI is dispatched to an isolated GitHub Actions runner for active public repositories only. The target checkout does not persist Git credentials or receive target-specific secrets. The workflow runs Flutter analysis, tests when present, coverage, and a release APK build.
 - No arbitrary Git mutation is executed by an MCP tool.
+- The tracked TypeScript configuration pins the React automatic JSX runtime and includes Next.js development type declarations, preventing production builds from rewriting tsconfig.json.
 
 - MCP also registers a unified audit module with an engine catalog, local CLI status probes, source-text heuristics and allowlisted scanner adapters. Native scanner binaries are not bundled into Vercel.
 - Audit subprocesses use fixed arguments without a shell and are restricted to AUDIT_ALLOWED_ROOTS. Output is bounded and sanitized before returning to MCP clients.
