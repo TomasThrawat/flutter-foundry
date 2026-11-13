@@ -26,6 +26,15 @@ flutter-analyze is a fixed, read-only CLI adapter. It runs flutter analyze --no-
 
 It does not invoke pub get, run tests or builds, or accept arbitrary CLI arguments. Vercel does not bundle the Flutter SDK; its engine status is therefore not_installed unless a separate host explicitly provides Flutter.
 
+## Dart duplication and fix preview
+
+Two more read-only adapters target Dart/Flutter projects. Both are skipped unless the selected project root contains pubspec.yaml.
+
+- `dart-fix-preview` runs the fixed command `dart fix --dry-run`. It only lists the analyzer fixes available (for example unused imports) and never modifies files; `--apply` is never used. Fixes appear only for lints enabled in `analysis_options.yaml`.
+- `jscpd` runs a duplicate-code scan over `**/*.dart` with the console reporter only, so no report files are written. Generated `*.g.dart`, `*.freezed.dart`, `*.gr.dart` and `*.mocks.dart` files and `.dart_tool` and `build` folders are ignored. It reports duplication; it does not remove it.
+
+`dart-code-linter` (`check-unused-files`, `check-unused-code`) is catalogued but not runnable by this server. It is started with `dart run`, which executes the project's own dev dependency, so run it yourself inside a project you trust.
+
 ## Version-pinned scanner execution
 
 The repository security gate pins Trivy and Semgrep versions and uses digest-pinned Gitleaks and OSV-Scanner images. The external audit runner uses explicit versions for Trivy and Semgrep, plus digest-pinned Gitleaks and OSV-Scanner images. Scanner findings and execution errors fail the workflow after reports are written; SKIPPED remains distinct from a clean scan.

@@ -134,6 +134,44 @@ const ENGINES: Engine[] = [
 			"Requires a local Flutter SDK and AUDIT_ALLOWED_ROOTS. Not bundled in Vercel; reports not_installed when unavailable.",
 	},
 	{
+		id: "dart-fix-preview",
+		name: "dart fix (dry run)",
+		category: "Flutter/Dart automated fixes",
+		license: "BSD-3-Clause",
+		repository: "https://github.com/dart-lang/sdk",
+		mode: "local-cli",
+		command: "dart",
+		purpose:
+			"Preview the analyzer fixes available for a Dart/Flutter project (for example unused imports) without changing any file.",
+		freeNotes:
+			"Fixed --dry-run only; --apply is never used. Fixes appear only for lints enabled in analysis_options.yaml. Uses existing package resolution and never runs pub get.",
+	},
+	{
+		id: "jscpd",
+		name: "jscpd",
+		category: "duplicate code",
+		license: "MIT",
+		repository: "https://github.com/kucherenko/jscpd",
+		mode: "local-cli",
+		command: "jscpd",
+		purpose:
+			"Find copy-pasted Dart code in a Flutter project. Generated *.g.dart, *.freezed.dart, *.gr.dart and *.mocks.dart files are ignored.",
+		freeNotes:
+			"Open-source CLI; console reporter only, so no report files are written. It reports duplication and does not remove it.",
+	},
+	{
+		id: "dart-code-linter",
+		name: "Dart Code Linter",
+		category: "Dart/Flutter unused code and metrics",
+		license: "MIT",
+		repository: "https://github.com/bancolombia/dart-code-linter",
+		mode: "local-cli",
+		purpose:
+			"Find unused Dart files and unused code (check-unused-files, check-unused-code) and report complexity metrics.",
+		freeNotes:
+			"Catalog only: it runs through dart run, which executes the project's own dev dependency, so this server never runs it. Add it as a dev dependency and run it in your own project.",
+	},
+	{
 		id: "ktlint",
 		name: "ktlint",
 		category: "Kotlin format/lint",
@@ -401,6 +439,27 @@ const RUNNERS: Record<string, Runner> = {
 		description:
 			"Read-only Flutter/Dart static analysis using the project's existing package resolution; never runs pub get or project tests.",
 	},
+	"dart-fix-preview": {
+		command: "dart",
+		args: ["fix", "--dry-run"],
+		description:
+			"Read-only preview of analyzer-suggested Dart fixes; --dry-run never modifies files and --apply is never used.",
+	},
+	jscpd: {
+		command: "jscpd",
+		args: [
+			"--reporters",
+			"console",
+			"--noSymlinks",
+			"--pattern",
+			"**/*.dart",
+			"--ignore",
+			"**/*.g.dart,**/*.freezed.dart,**/*.gr.dart,**/*.mocks.dart,**/.dart_tool/**,**/build/**",
+			".",
+		],
+		description:
+			"Duplicate-code scan of Dart sources with the console reporter only; no report files are written.",
+	},
 	ktlint: {
 		command: "ktlint",
 		args: [],
@@ -436,6 +495,14 @@ const IGNORED = new Set([
 	"coverage",
 ]);
 const OUTPUT_LIMIT = 16000;
+// Engines that only make sense inside a Dart/Flutter project (pubspec.yaml required).
+const DART_PROJECT_ENGINES = new Set([
+	"flutter-analyze",
+	"dart-fix-preview",
+	"jscpd",
+]);
+// Engines that start the Dart analyzer and need the longer timeout.
+const ANALYZER_ENGINES = new Set(["flutter-analyze", "dart-fix-preview"]);
 export function getAuditEngineCatalog() {
 	return ENGINES.map((engine) => ({
 		...engine,
@@ -765,7 +832,7 @@ async function probe(command: string) {
 		command,
 		["--version"],
 		process.cwd(),
-		command === "flutter" ? 5000 : 1800,
+		command === "flutter" || command === "dart" ? 5000 : 1800,
 	);
 	if (r.spawnError)
 		return {
@@ -828,7 +895,7 @@ function outSummary(r: Proc) {
 async function execute(id: string, root: string, timeout: number) {
 	const spec = RUNNERS[id];
 	if (!spec) return { engine: id, status: "not_directly_runnable" };
-	if (id === "flutter-analyze") {
+	if (DART_PROJECT_ENGINES.has(id)) {
 		try {
 			if (!statSync(path.join(root, "pubspec.yaml")).isFile())
 				return {
@@ -998,6 +1065,8 @@ export function registerAuditTools(register: AuditToolRegistrar) {
 					"golangci-lint",
 					"supply-chain-guard",
 					"prism-scanner",
+					"dart-fix-preview",
+					"jscpd",
 				]),
 				repositoryPath: z.string().min(1).max(1000).optional(),
 			})
@@ -1018,8 +1087,8 @@ export function registerAuditTools(register: AuditToolRegistrar) {
 					error: p.error,
 					installHint: "Install the upstream CLI and add it to PATH.",
 				};
-			const maxTimeout = engine === "flutter-analyze" ? 45000 : 20000;
-			const defaultTimeout = engine === "flutter-analyze" ? 30000 : 12000;
+			const maxTimeout = ANALYZER_ENGINES.has(engine) ? 45000 : 20000;
+			const defaultTimeout = ANALYZER_ENGINES.has(engine) ? 30000 : 12000;
 			const timeout = Math.min(
 				maxTimeout,
 				Math.max(
@@ -1059,9 +1128,11 @@ export function registerAuditTools(register: AuditToolRegistrar) {
 							"golangci-lint",
 							"supply-chain-guard",
 							"prism-scanner",
+							"dart-fix-preview",
+							"jscpd",
 						]),
 					)
-					.max(14)
+					.max(16)
 					.optional(),
 			})
 			.strict(),
