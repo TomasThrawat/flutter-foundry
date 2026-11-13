@@ -38,9 +38,12 @@ test("catalog contains original engines and discovered add-ons", () => {
 		"nox",
 		"ai-patchlab",
 		"comply-oss",
+		"dart-fix-preview",
+		"jscpd",
+		"dart-code-linter",
 	])
 		assert.ok(ids.has(id), "missing " + id);
-	assert.ok(ids.size >= 26);
+	assert.ok(ids.size >= 29);
 });
 test("runner allowlist excludes arbitrary AI and mutating graph workflows", () => {
 	const ids = getRunnableEngineIds();
@@ -50,6 +53,18 @@ test("runner allowlist excludes arbitrary AI and mutating graph workflows", () =
 	assert.ok(ids.includes("prism-scanner"));
 	assert.ok(!ids.includes("pr-agent"));
 	assert.ok(!ids.includes("codegraph"));
+});
+test("Dart quality engines are read-only allowlisted adapters", () => {
+	const ids = getRunnableEngineIds();
+	assert.ok(ids.includes("dart-fix-preview"));
+	assert.ok(ids.includes("jscpd"));
+	// dart run executes the project's own dev dependency, so it stays catalog-only.
+	assert.ok(!ids.includes("dart-code-linter"));
+	const catalog = getAuditEngineCatalog();
+	const byId = new Map(catalog.map((x) => [x.id, x]));
+	assert.equal(byId.get("dart-fix-preview")?.runnableByThisServer, true);
+	assert.equal(byId.get("jscpd")?.runnableByThisServer, true);
+	assert.equal(byId.get("dart-code-linter")?.runnableByThisServer, false);
 });
 test("path containment rejects sibling prefixes and parent traversal", () => {
 	assert.equal(
