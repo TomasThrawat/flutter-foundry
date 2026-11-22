@@ -5,7 +5,7 @@
 	"description": "Open-source Flutter engineering MCP with SVG-Edit + Playwright icon workflow.",
 	"license": "MIT",
 	"engines": {
-		"node": ">=20.9.0"
+		"node": "24.x"
 	},
 	"scripts": {
 		"dev": "next dev",

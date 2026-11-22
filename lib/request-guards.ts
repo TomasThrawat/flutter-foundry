@@ -73,10 +73,9 @@ export function bestEffortRateLimit(
 		windowMs < 1
 	)
 		throw new Error("Rate-limit values must be positive integers.");
-	const forwarded = request.headers.get("x-forwarded-for");
 	const address =
-		forwarded?.split(",")[0]?.trim() ||
-		request.headers.get("x-real-ip")?.trim();
+		request.headers.get("x-real-ip")?.trim() ||
+		request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
 	if (!address) return null;
 	const key = routeKey + ":" + address;
 	const now = Date.now();

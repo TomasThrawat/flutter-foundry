@@ -156,15 +156,26 @@ export function sanitizeSvgInput(svg: string): string {
 			) {
 				throw new Error('Unsafe value in SVG attribute "' + name + '".');
 			}
-			if (
-				/url\s*\(/i.test(value) &&
-				!/url\(\s*["']?#[-\w:.]+["']?\s*\)/i.test(value)
-			) {
-				throw new Error(
-					'External or unsupported URL reference in SVG attribute "' +
-						name +
-						'".',
-				);
+			const urlFunctionCount = value.match(/url\s*\(/gi)?.length ?? 0;
+			if (urlFunctionCount > 0) {
+				const urlReferences = [
+					...value.matchAll(
+						/url\s*\(\s*(?:"([^"]*)"|'([^']*)'|([^)]+?))\s*\)/gi,
+					),
+				];
+				const onlyLocalReferences =
+					urlReferences.length === urlFunctionCount &&
+					urlReferences.every((match) => {
+						const reference = (match[1] ?? match[2] ?? match[3] ?? "").trim();
+						return /^#[\w:.-]+$/.test(reference);
+					});
+				if (!onlyLocalReferences) {
+					throw new Error(
+						'External or unsupported URL reference in SVG attribute "' +
+							name +
+							'".',
+					);
+				}
 			}
 		}
 		for (const name of remove) element.removeAttribute(name);

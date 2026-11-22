@@ -370,7 +370,10 @@ export function composeSuperpowersWorkflow(goal: string) {
 	const finishing = /\b(finish|release|merge|ship|publish)\b/.test(text);
 
 	if (debugging) add("systematic-debugging");
-	if (design) add("brainstorming");
+	if (design) {
+		add("brainstorming");
+		add("writing-plans");
+	}
 	if (coding && design) add("using-git-worktrees");
 	if (coding) {
 		add("writing-plans");

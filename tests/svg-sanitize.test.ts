@@ -151,6 +151,19 @@ test("sanitizer rejects active content and unsafe URL references", () => {
 	);
 });
 
+test("sanitizer rejects mixed local and external URL references", () => {
+	for (const value of [
+		"url(#brand) url(https://example.com/paint)",
+		"url(#brand) url(//example.com/paint)",
+		"url('#brand') url('https://example.com/paint')",
+	]) {
+		assert.throws(
+			() => sanitizeSvgInput(svg("", `filter=\"${value}\"`)),
+			/External or unsupported URL/,
+		);
+	}
+});
+
 test("sanitizer preserves safe local paint-server references", () => {
 	const clean = sanitizeSvgInput(
 		svg(
