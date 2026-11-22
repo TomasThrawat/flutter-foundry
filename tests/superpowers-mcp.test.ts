@@ -166,7 +166,10 @@ test("design-only workflow composition satisfies the validator's required skills
 	const selected = composition.workflow.map((step) => step.skill);
 	assert.ok(selected.includes("brainstorming"));
 	assert.ok(selected.includes("writing-plans"));
-	assert.equal(validateSuperpowersWorkflow("Design a new product", selected).valid, true);
+	assert.equal(
+		validateSuperpowersWorkflow("Design a new product", selected).valid,
+		true,
+	);
 });
 
 test("workflow validation identifies missing design, TDD, and verification guardrails", () => {

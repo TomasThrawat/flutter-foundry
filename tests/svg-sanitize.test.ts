@@ -158,7 +158,7 @@ test("sanitizer rejects mixed local and external URL references", () => {
 		"url('#brand') url('https://example.com/paint')",
 	]) {
 		assert.throws(
-			() => sanitizeSvgInput(svg("", `filter=\"${value}\"`)),
+			() => sanitizeSvgInput(svg("", `filter="${value}"`)),
 			/External or unsupported URL/,
 		);
 	}
