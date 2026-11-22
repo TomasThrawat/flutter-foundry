@@ -72,6 +72,8 @@ jobs:
           fi
       - name: Validate target repository and reference
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [[ ! "$TARGET_REPOSITORY" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$ ]] || [[ "$TARGET_REPOSITORY" == *".."* ]]; then
@@ -82,7 +84,18 @@ jobs:
             echo "Invalid target ref."
             exit 1
           fi
-          visibility="$(curl --fail --silent --show-error "https://api.github.com/repos/$TARGET_REPOSITORY" | jq -r '.visibility')"
+          api_headers=(-H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          metadata=""
+          if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+            metadata="$(curl --fail --silent --show-error "${api_headers[@]}" -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/$TARGET_REPOSITORY")" || metadata=""
+          fi
+          if [[ -z "$metadata" ]]; then
+            metadata="$(curl --fail --silent --show-error "${api_headers[@]}" "https://api.github.com/repos/$TARGET_REPOSITORY")" || {
+              echo "GitHub denied repository metadata lookup; unable to validate the target's visibility." >&2
+              exit 1
+            }
+          fi
+          visibility="$(jq -r '.visibility // empty' <<< "$metadata")"
           if [[ "$visibility" != "public" ]]; then
             echo "Only public repositories can be scanned by this workflow."
             exit 1

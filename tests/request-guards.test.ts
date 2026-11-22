@@ -54,6 +54,25 @@ test("best-effort rate limiting returns 429 after the configured request count",
 	assert.ok(limited?.headers.get("retry-after"));
 });
 
+test("prefers the trusted real client IP over a changing forwarded header", () => {
+	const makeRequest = (forwarded: string) =>
+		new Request("https://example.test/api", {
+			headers: {
+				"x-real-ip": "198.51.100.27",
+				"x-forwarded-for": forwarded,
+			},
+		});
+	assert.equal(
+		bestEffortRateLimit(makeRequest("203.0.113.1"), "trusted-ip", 1, 60_000),
+		null,
+	);
+	assert.equal(
+		bestEffortRateLimit(makeRequest("203.0.113.99"), "trusted-ip", 1, 60_000)
+			?.status,
+		429,
+	);
+});
+
 test("does not apply a shared anonymous bucket when no proxy address is available", () => {
 	const request = new Request("https://example.test/api");
 	assert.equal(
